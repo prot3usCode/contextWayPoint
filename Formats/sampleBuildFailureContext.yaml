@@ -1,0 +1,72 @@
+# Copyright (c) 2026 Daniel Bueno
+# SPDX-License-Identifier: MIT
+# See LICENSE for the full license text.
+
+title: Build Failure Triage
+uuid: build_failure_triage
+problems:
+  - problem_name: Build Failure Triage
+    problem_uuid:
+    step_number: 1
+    weight: 80
+    keywords:
+      - build failure
+      - ci
+      - pipeline
+      - triage
+
+text: >
+  This context covers the high-level approach for investigating a failed build
+  or deployment pipeline run.
+
+entries:
+  - title: Diagnostic Checks
+    uuid: diagnostic_checks
+    problems:
+      - problem_name: Build Failure Triage
+        problem_uuid:
+        step_number: 2
+        weight: 40
+        keywords:
+          - logs
+          - failing step
+          - branch
+          - commit
+
+    text: >
+      Start by identifying the failing workflow, branch, commit SHA, exact error
+      message, and whether the failure reproduces on rerun.
+
+    entries:
+      - title: Logs and Artifacts
+        uuid: logs_and_artifacts
+        problems:
+          - problem_name: Build Failure Triage
+            problem_uuid:
+            step_number: 3
+            weight: 25
+            keywords:
+              - logs
+              - artifacts
+              - stack trace
+
+        text: >
+          Review job logs, generated artifacts, screenshots, and stack traces to
+          isolate the first failing action instead of only the final reported
+          error.
+
+      - title: Common Failure Patterns
+        uuid: common_failure_patterns
+        problems:
+          - problem_name: Build Failure Triage
+            problem_uuid:
+            step_number: 4
+            weight: 20
+            keywords:
+              - dependencies
+              - environment
+              - flaky tests
+
+        text: >
+          Check for common issues such as missing dependencies, expired secrets,
+          environment drift, flaky tests, or recent configuration changes.
