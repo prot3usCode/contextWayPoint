@@ -102,22 +102,140 @@ def to_camel_case(text: str) -> str:
 
 
 def format_results_as_text(results: list[dict[str, Any]]) -> str:
+    if not results:
+        return ""
+
     text_blocks = [item["text"] for item in results if item.get("text")]
     return "\n\n".join(text_blocks)
+
+
+def format_results_as_markdown(
+    results: list[dict[str, Any]],
+    problem_name: str,
+    mode: str,
+) -> str:
+    lines = [
+        f"# Context Packet: {problem_name}",
+        "",
+        f"Mode: `{mode}`",
+        "",
+    ]
+
+    if not results:
+        lines.append("No context found.")
+        return "\n".join(lines)
+
+    for item in results:
+        problem = item["matched_problem"]
+        step_number = problem.get("step_number")
+        weight = problem.get("weight")
+        path = " > ".join(item.get("path", []))
+        keywords = problem.get("keywords", [])
+
+        lines.extend(
+            [
+                f"## Step {step_number} - {item['title']}",
+                "",
+                f"**Weight:** {weight}",
+                "",
+            ]
+        )
+
+        if path:
+            lines.extend([f"**Path:** `{path}`", ""])
+
+        if keywords:
+            lines.extend([f"**Keywords:** {', '.join(keywords)}", ""])
+
+        lines.extend([item.get("text", ""), ""])
+
+    return "\n".join(lines).strip()
+
+
+def build_json_payload(
+    results: list[dict[str, Any]],
+    problem_name: str,
+    mode: str,
+) -> dict[str, Any]:
+    entries: list[dict[str, Any]] = []
+
+    for item in results:
+        problem = item["matched_problem"]
+        entries.append(
+            {
+                "title": item["title"],
+                "uuid": item["uuid"],
+                "parent_uuid": item.get("parent_uuid"),
+                "depth": item.get("depth", 0),
+                "path": item.get("path", []),
+                "step_number": problem.get("step_number"),
+                "weight": problem.get("weight"),
+                "problem_uuid": problem.get("problem_uuid"),
+                "keywords": problem.get("keywords", []),
+                "text": item.get("text", ""),
+            }
+        )
+
+    return {
+        "problem_name": problem_name,
+        "mode": mode,
+        "entry_count": len(entries),
+        "entries": entries,
+    }
+
+
+def format_results_as_json(
+    results: list[dict[str, Any]],
+    problem_name: str,
+    mode: str,
+) -> str:
+    return json.dumps(
+        build_json_payload(results, problem_name, mode),
+        indent=2,
+    )
+
+
+def render_results(
+    results: list[dict[str, Any]],
+    problem_name: str,
+    mode: str,
+    output_format: str,
+) -> str:
+    if output_format == "txt":
+        if not results:
+            return f"No context found for problem: {problem_name}"
+        return format_results_as_text(results)
+
+    if output_format == "md":
+        return format_results_as_markdown(results, problem_name, mode)
+
+    if output_format == "json":
+        return format_results_as_json(results, problem_name, mode)
+
+    raise ValueError(f"Unsupported format: {output_format}")
 
 
 def write_results_to_file(
     results: list[dict[str, Any]],
     problem_name: str,
     mode: str,
+    output_format: str,
     output_dir: Path = OUTPUT_DIR,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    file_name = f"{to_camel_case(problem_name)}{mode[:1].upper() + mode[1:]}.txt"
+    extension_by_format = {
+        "txt": "txt",
+        "md": "md",
+        "json": "json",
+    }
+    extension = extension_by_format[output_format]
+    file_name = (
+        f"{to_camel_case(problem_name)}{mode[:1].upper() + mode[1:]}.{extension}"
+    )
     output_path = output_dir / file_name
 
-    output_text = format_results_as_text(results)
+    output_text = render_results(results, problem_name, mode, output_format)
 
     with output_path.open("w", encoding="utf-8") as file_handle:
         file_handle.write(output_text)
@@ -125,12 +243,13 @@ def write_results_to_file(
     return output_path
 
 
-def print_results(results: list[dict[str, Any]], problem_name: str) -> None:
-    if not results:
-        print(f"No context found for problem: {problem_name}")
-        return
-
-    print(format_results_as_text(results))
+def print_results(
+    results: list[dict[str, Any]],
+    problem_name: str,
+    mode: str,
+    output_format: str,
+) -> None:
+    print(render_results(results, problem_name, mode, output_format))
 
 
 def parse_args() -> argparse.Namespace:
@@ -139,13 +258,19 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "problem_name",
-        help='Problem name, for example: "Build Failure Triage"',
+        help='Problem name, for example: "Order Flow Issue Triage"',
     )
     parser.add_argument(
         "--mode",
         choices=("step", "weight", "yaml"),
         default="step",
         help="Sort by step, weight, or raw YAML traversal order.",
+    )
+    parser.add_argument(
+        "--format",
+        choices=("txt", "md", "json"),
+        default="txt",
+        help="Render the routed packet as plain text, Markdown, or JSON.",
     )
     parser.add_argument(
         "--index-file",
@@ -170,12 +295,13 @@ def main() -> None:
     )
     sorted_results = sort_results(results, args.mode)
 
-    print_results(sorted_results, args.problem_name)
+    print_results(sorted_results, args.problem_name, args.mode, args.format)
 
     output_path = write_results_to_file(
         sorted_results,
         args.problem_name,
         args.mode,
+        args.format,
         output_dir=args.output_dir,
     )
     print(f"\nWrote context packet to: {display_path(output_path)}")

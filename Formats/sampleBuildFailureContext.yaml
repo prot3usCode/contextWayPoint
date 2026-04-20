@@ -2,71 +2,219 @@
 # SPDX-License-Identifier: MIT
 # See LICENSE for the full license text.
 
-title: Build Failure Triage
-uuid: build_failure_triage
+title: Order Flow Issue Triage
+uuid: order_flow_issue_triage
 problems:
-  - problem_name: Build Failure Triage
+  - problem_name: Order Flow Issue Triage
     problem_uuid:
     step_number: 1
     weight: 80
     keywords:
-      - build failure
-      - ci
-      - pipeline
+      - orders
+      - payments
+      - inventory
+      - shipments
       - triage
+  - problem_name: Shipment Delay Investigation
+    problem_uuid:
+    step_number: 1
+    weight: 65
+    keywords:
+      - shipment delay
+      - delayed order
+      - tracking
+      - fulfillment
+  - problem_name: Payment Failure Investigation
+    problem_uuid:
+    step_number: 1
+    weight: 70
+    keywords:
+      - payment failure
+      - blocked order
+      - failed payment
+      - refund
+  - problem_name: Inventory Shortage Investigation
+    problem_uuid:
+    step_number: 1
+    weight: 68
+    keywords:
+      - inventory shortage
+      - stock
+      - availability
+      - paid not shipped
 
 text: >
-  This context covers the high-level approach for investigating a failed build
-  or deployment pipeline run.
+  This context covers how to troubleshoot issues in the sample order data flow
+  described in Database/howToSetUpTestPostgres.md. The underlying model links
+  customers, orders, order_items, inventory, payments, and shipments so that
+  blocked, delayed, or inconsistent order states can be investigated.
 
 entries:
-  - title: Diagnostic Checks
-    uuid: diagnostic_checks
+  - title: Start with the Order Overview
+    uuid: start_with_the_order_overview
     problems:
-      - problem_name: Build Failure Triage
+      - problem_name: Order Flow Issue Triage
         problem_uuid:
         step_number: 2
         weight: 40
         keywords:
-          - logs
-          - failing step
-          - branch
-          - commit
+          - order_id
+          - order status
+          - customer
+          - overview
+      - problem_name: Shipment Delay Investigation
+        problem_uuid:
+        step_number: 2
+        weight: 35
+        keywords:
+          - order overview
+          - order status
+          - shipment exists
+          - delayed
+      - problem_name: Payment Failure Investigation
+        problem_uuid:
+        step_number: 2
+        weight: 38
+        keywords:
+          - blocked order
+          - order overview
+          - payment exists
+          - customer
+      - problem_name: Inventory Shortage Investigation
+        problem_uuid:
+        step_number: 2
+        weight: 36
+        keywords:
+          - order overview
+          - order items
+          - paid order
+          - fulfillment
 
     text: >
-      Start by identifying the failing workflow, branch, commit SHA, exact error
-      message, and whether the failure reproduces on rerun.
+      Start with a single order and build a joined view across orders, customers,
+      payments, and shipments. The first pass should answer who placed the order,
+      what the current order_status is, whether a payment record exists, and
+      whether a shipment exists at all.
 
     entries:
-      - title: Logs and Artifacts
-        uuid: logs_and_artifacts
+      - title: Payment Path Checks
+        uuid: payment_path_checks
         problems:
-          - problem_name: Build Failure Triage
+          - problem_name: Order Flow Issue Triage
             problem_uuid:
             step_number: 3
-            weight: 25
+            weight: 30
             keywords:
-              - logs
-              - artifacts
-              - stack trace
+              - payment_status
+              - failed
+              - pending
+              - refunded
+          - problem_name: Payment Failure Investigation
+            problem_uuid:
+            step_number: 3
+            weight: 48
+            keywords:
+              - payment_status
+              - failed
+              - pending
+              - refunded
 
         text: >
-          Review job logs, generated artifacts, screenshots, and stack traces to
-          isolate the first failing action instead of only the final reported
-          error.
+          Check payments next. In this model, failed or pending payments explain
+          why some orders never progress to shipment creation, while refunded
+          payments align with cancelled orders. A completed payment does not by
+          itself guarantee fulfillment, so treat it as necessary but not sufficient.
 
-      - title: Common Failure Patterns
-        uuid: common_failure_patterns
+      - title: Inventory Allocation Checks
+        uuid: inventory_allocation_checks
         problems:
-          - problem_name: Build Failure Triage
+          - problem_name: Order Flow Issue Triage
             problem_uuid:
             step_number: 4
-            weight: 20
+            weight: 25
             keywords:
-              - dependencies
-              - environment
-              - flaky tests
+              - inventory
+              - available_quantity
+              - reserved_quantity
+              - shortage
+          - problem_name: Inventory Shortage Investigation
+            problem_uuid:
+            step_number: 3
+            weight: 46
+            keywords:
+              - inventory
+              - shortage
+              - available_quantity
+              - reserved_quantity
 
         text: >
-          Check for common issues such as missing dependencies, expired secrets,
-          environment drift, flaky tests, or recent configuration changes.
+          Compare ordered quantities in order_items against available and reserved
+          inventory for the related products. This explains cases where payment is
+          complete but the order still cannot move forward because stock is short
+          at fulfillment time.
+
+      - title: Shipment State Checks
+        uuid: shipment_state_checks
+        problems:
+          - problem_name: Order Flow Issue Triage
+            problem_uuid:
+            step_number: 5
+            weight: 20
+            keywords:
+              - shipment_status
+              - delayed
+              - tracking_number
+              - shipped_at
+          - problem_name: Shipment Delay Investigation
+            problem_uuid:
+            step_number: 3
+            weight: 45
+            keywords:
+              - delayed
+              - shipment_status
+              - tracking_number
+              - shipped_at
+
+        text: >
+          If payment and inventory both look healthy, inspect shipments. Missing
+          shipment rows, delayed statuses, or absent shipped_at values help
+          distinguish between orders that are waiting for fulfillment and orders
+          that are stuck inside the shipment workflow itself.
+
+      - title: Cross-Table Consistency Rules
+        uuid: cross_table_consistency_rules
+        problems:
+          - problem_name: Order Flow Issue Triage
+            problem_uuid:
+            step_number: 6
+            weight: 18
+            keywords:
+              - consistency
+              - blocked
+              - processing
+              - cancelled
+          - problem_name: Payment Failure Investigation
+            problem_uuid:
+            step_number: 4
+            weight: 24
+            keywords:
+              - blocked
+              - failed payment
+              - refunded
+              - consistency
+          - problem_name: Inventory Shortage Investigation
+            problem_uuid:
+            step_number: 4
+            weight: 22
+            keywords:
+              - paid not shipped
+              - shortage
+              - consistency
+              - blocked
+
+        text: >
+          Use the model's example scenarios as consistency checks. A blocked order
+          should line up with a failed payment, a paid order with no shipment may
+          point to inventory shortage, a delayed shipment should still have a
+          shipment row, and a cancelled order should not continue through normal
+          fulfillment.

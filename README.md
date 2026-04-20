@@ -9,7 +9,7 @@ It takes a YAML-shaped source file, compiles it into a flattened JSON index, and
 - Compiles nested context entries into a queryable JSON index
 - Matches entries by `problem_name`
 - Sorts routed output by `step`, `weight`, or raw YAML order
-- Produces plain text packets with only the context text in the selected order
+- Produces routed packets in `txt`, `md`, or `json` format
 
 ## Main Scripts
 
@@ -20,13 +20,13 @@ It takes a YAML-shaped source file, compiles it into a flattened JSON index, and
 
 ```bash
 python src/contextCompiler.py --input Formats/sampleBuildFailureContext.yaml
-python src/contextRouter.py "Build Failure Triage" --mode step
+python src/contextRouter.py "Order Flow Issue Triage" --mode step --format txt
 ```
 
 ## Output
 
 - Compiled index: `output/contextIndex.json`
-- Routed packet: `output/contextPackets/<problem><mode>.txt`
+- Routed packet: `output/contextPackets/<problem><mode>.<format>`
 
 ## Included Example
 

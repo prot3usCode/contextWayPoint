@@ -1,0 +1,203 @@
+# Copyright (c) 2026 Daniel Bueno
+# SPDX-License-Identifier: MIT
+# See LICENSE for the full license text.
+
+import argparse
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+
+ValidationErrorList = list[str]
+
+
+def format_location(path: list[str]) -> str:
+    if not path:
+        return "root"
+    return " > ".join(path)
+
+
+def is_blank(value: Any) -> bool:
+    return value is None or (isinstance(value, str) and not value.strip())
+
+
+def validate_problem(
+    problem: dict[str, Any],
+    errors: ValidationErrorList,
+    location: str,
+    problem_index: int,
+    seen_problem_uuids: set[str],
+) -> None:
+    prefix = f"{location} / problems[{problem_index}]"
+
+    if not isinstance(problem, dict):
+        errors.append(f"{prefix}: problem must be a mapping/object")
+        return
+
+    if is_blank(problem.get("problem_name")):
+        errors.append(f"{prefix}: missing problem_name")
+
+    problem_uuid = problem.get("problem_uuid")
+    if not is_blank(problem_uuid):
+        if problem_uuid in seen_problem_uuids:
+            errors.append(f"{prefix}: duplicate problem_uuid '{problem_uuid}'")
+        else:
+            seen_problem_uuids.add(problem_uuid)
+
+    step_number = problem.get("step_number")
+    if step_number is None:
+        errors.append(f"{prefix}: missing step_number")
+    elif not isinstance(step_number, int):
+        errors.append(f"{prefix}: step_number must be an integer")
+
+    weight = problem.get("weight")
+    if weight is None:
+        errors.append(f"{prefix}: missing weight")
+    elif not isinstance(weight, (int, float)):
+        errors.append(f"{prefix}: weight must be a number")
+    elif weight < 0:
+        errors.append(f"{prefix}: weight cannot be negative")
+
+    keywords = problem.get("keywords", [])
+    if keywords is None:
+        return
+
+    if not isinstance(keywords, list):
+        errors.append(f"{prefix}: keywords must be a list")
+        return
+
+    for keyword_index, keyword in enumerate(keywords):
+        if is_blank(keyword):
+            errors.append(f"{prefix}: keywords[{keyword_index}] is blank")
+
+
+def validate_entry(
+    entry: dict[str, Any],
+    errors: ValidationErrorList,
+    seen_uuids: set[str],
+    seen_problem_uuids: set[str],
+    path: list[str] | None = None,
+) -> None:
+    if path is None:
+        path = []
+
+    if not isinstance(entry, dict):
+        errors.append(f"{format_location(path)}: entry must be a mapping/object")
+        return
+
+    title = entry.get("title")
+    entry_uuid = entry.get("uuid")
+
+    display_title = title if not is_blank(title) else "<missing title>"
+    current_path = path + [str(display_title)]
+    location = format_location(current_path)
+
+    if is_blank(title):
+        errors.append(f"{location}: missing title")
+
+    if is_blank(entry_uuid):
+        errors.append(f"{location}: missing uuid")
+    elif entry_uuid in seen_uuids:
+        errors.append(f"{location}: duplicate uuid '{entry_uuid}'")
+    else:
+        seen_uuids.add(entry_uuid)
+
+    text = entry.get("text")
+    if is_blank(text):
+        errors.append(f"{location}: blank text")
+
+    problems = entry.get("problems", [])
+    if problems is None:
+        problems = []
+
+    if not isinstance(problems, list):
+        errors.append(f"{location}: problems must be a list")
+    else:
+        for problem_index, problem in enumerate(problems):
+            validate_problem(
+                problem,
+                errors,
+                location,
+                problem_index,
+                seen_problem_uuids,
+            )
+
+    children = entry.get("entries", [])
+    if children is None:
+        children = []
+
+    if not isinstance(children, list):
+        errors.append(f"{location}: entries must be a list")
+        return
+
+    for child in children:
+        validate_entry(child, errors, seen_uuids, seen_problem_uuids, current_path)
+
+
+def validate_context_tree(root: dict[str, Any]) -> ValidationErrorList:
+    errors: ValidationErrorList = []
+    seen_uuids: set[str] = set()
+    seen_problem_uuids: set[str] = set()
+
+    validate_entry(root, errors, seen_uuids, seen_problem_uuids)
+
+    return errors
+
+
+def load_yaml(input_file: Path) -> dict[str, Any]:
+    with input_file.open("r", encoding="utf-8") as file_handle:
+        loaded = yaml.safe_load(file_handle)
+
+    if loaded is None:
+        raise ValueError(f"{input_file} is empty")
+
+    if not isinstance(loaded, dict):
+        raise ValueError(f"{input_file} must contain a YAML mapping/object at the root")
+
+    return loaded
+
+
+def validate_file(input_file: Path) -> ValidationErrorList:
+    root = load_yaml(input_file)
+    return validate_context_tree(root)
+
+
+def print_validation_errors(errors: ValidationErrorList) -> None:
+    print("Validation failed:")
+    for error in errors:
+        print(f"- {error}")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Validate a contextWayPoint YAML file."
+    )
+    parser.add_argument(
+        "--input",
+        type=Path,
+        required=True,
+        help="Input YAML-like context file to validate.",
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+
+    try:
+        errors = validate_file(args.input)
+    except ValueError as error:
+        print("Validation failed:")
+        print(f"- {error}")
+        raise SystemExit(1)
+
+    if errors:
+        print_validation_errors(errors)
+        raise SystemExit(1)
+
+    print(f"Validation passed: {args.input}")
+
+
+if __name__ == "__main__":
+    main()
