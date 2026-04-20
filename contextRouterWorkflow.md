@@ -2,21 +2,47 @@
 <!-- SPDX-License-Identifier: MIT -->
 <!-- See LICENSE for the full license text. -->
 
-# Context Router Workflow
+# contextWayPoint Workflow
 
-This document describes the full process from writing the source YAML file to generating routed output text.
+This document is the practical runbook for the current codebase. It covers the
+full path from authoring a context file to generating a routed context packet.
 
-## Project Location
+## What the Project Does
+
+`contextWayPoint` exists to make authored context easier for an LLM or agent to
+consume correctly.
+
+Current workflow:
+
+1. write a nested YAML context outline
+2. attach problem flows to sections
+3. validate the structure
+4. compile it into flat JSON
+5. route a packet for one problem
+6. render that packet as `txt`, `md`, or `json`
+
+Current routing modes:
+
+- `step`
+- `weight`
+- `yaml`
+
+Not implemented yet:
+
+- keyword routing
+- tests
+- installable packaging
+- evals
+
+## Project Root
 
 Run commands from the project root folder:
 
 `contextWaypoint`
 
-## 1. Set Up the Environment
+## 1. Set Up Python
 
 ### macOS or Linux
-
-From the project root, create and activate a virtual environment:
 
 ```bash
 python3 -m venv .venv
@@ -26,11 +52,11 @@ python -m pip install PyYAML
 
 ### Windows 11
 
-If this is a corporate Windows 11 machine, the safest path is:
+For a locked-down work machine, the safest path is still:
 
-1. Use an already-approved Python install if your company provides one.
-2. If Python is not already installed, request an approved install of Python 3.10+ from IT.
-3. Avoid trying to bypass local admin, endpoint protection, or software policy controls.
+1. use an already-approved Python install if you have one
+2. otherwise ask IT for Python 3.10+
+3. avoid trying to bypass endpoint or execution policy controls
 
 From PowerShell in the project root:
 
@@ -40,47 +66,38 @@ py -3 -m venv .venv
 python -m pip install PyYAML
 ```
 
-If PowerShell blocks script activation because of execution policy, you can run the venv Python directly without activating it:
+If PowerShell activation is blocked, run the venv Python directly:
 
 ```powershell
 py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install PyYAML
-.\.venv\Scripts\python.exe .\src\contextCompiler.py
+.\.venv\Scripts\python.exe .\src\contextValidator.py --input .\Formats\sampleBuildFailureContext.yaml
+.\.venv\Scripts\python.exe .\src\contextCompiler.py --input .\Formats\sampleBuildFailureContext.yaml
 .\.venv\Scripts\python.exe .\src\contextRouter.py "Order Flow Issue Triage" --mode step --format txt
 ```
 
-What this installs:
+What you need installed:
 
 - Python 3.10+
 - `PyYAML`
 
-### If `pip install` Is Blocked at Work
+What you do not need:
 
-Common corporate environments block direct package downloads. If that happens, use one of these approved paths:
+- Docker
+- a VM
+- Node
+- Postgres
+- an API key
 
-1. Ask IT whether Python packages can be installed from an internal package mirror.
-2. Ask IT to provide or approve the `PyYAML` wheel file for your Python version.
-3. Install from a locally approved wheel instead of the public internet.
+## 2. Write the Source YAML
 
-Example local wheel install:
-
-```powershell
-python -m pip install .\wheels\PyYAML-6.0.3-cp314-cp314-win_amd64.whl
-```
-
-Important:
-
-- Once Python is installed, creating `.venv` usually does not require admin rights.
-- This project does not require Docker, a VM, Node, Postgres, or an API key.
-- The only non-stdlib dependency right now is `PyYAML`.
-
-## 2. Write the Source YAML File
-
-Write your own local context source file anywhere you want. It does not need to live in the repository.
-
-Included example file:
+You can author a context file anywhere, but the repository includes one sample:
 
 `Formats/sampleBuildFailureContext.yaml`
+
+That sample currently models troubleshooting around an order workflow described in:
+
+`Database/howToSetUpTestPostgres.md`
 
 Each entry can contain:
 
@@ -90,7 +107,7 @@ Each entry can contain:
 - `problems`
 - `entries`
 
-Minimal example:
+Minimal shape:
 
 ```yaml
 title: Root Title
@@ -115,11 +132,12 @@ entries:
 
 Notes:
 
-- Every entry must have a `title`.
-- Every entry must have a `uuid`.
-- If `problem_uuid` is blank, the compiler can still compile, but it will generate a UUID at compile time unless you fill and save one permanently.
+- every entry must have a `title`
+- every entry must have a `uuid`
+- blank `problem_uuid` values are allowed while drafting
+- if you do not fill `problem_uuid` values permanently, compile will generate them
 
-## 3. Validate the YAML File
+## 3. Validate the YAML
 
 Run:
 
@@ -127,7 +145,7 @@ Run:
 python src/contextValidator.py --input Formats/sampleBuildFailureContext.yaml
 ```
 
-What validation checks today:
+Validation currently checks:
 
 - missing entry `title`
 - missing entry `uuid`
@@ -138,9 +156,9 @@ What validation checks today:
 - missing or invalid `weight`
 - duplicate `problem_uuid`
 
-If validation fails, fix the YAML first before compiling.
+If validation fails, fix the YAML first.
 
-## 4. Compile the YAML into the Queryable JSON Index
+## 4. Compile to the Flat JSON Index
 
 Run:
 
@@ -152,47 +170,57 @@ This writes:
 
 `output/contextIndex.json`
 
-If you want to compile a different input file:
+What the compiler preserves:
+
+- entry `uuid`
+- title
+- parent/child relationship
+- depth
+- full path
+- text
+- problem metadata
+- authored traversal order as `source_order`
+
+If you want a different output path:
 
 ```bash
-python src/contextCompiler.py --input path/to/myFile.yaml
+python src/contextCompiler.py --input path/to/myFile.yaml --output output/myIndex.json
 ```
 
-## 5. Optionally Fill Blank Problem UUIDs Permanently
+## 5. Optionally Fill Blank Problem UUIDs
 
-If you are still drafting, blank `problem_uuid` values are okay. The compiler will generate them during compile.
+Blank `problem_uuid` values are fine for early drafting, but they are not stable
+identifiers until you save them somewhere.
 
-If you want stable UUIDs that do not change between compiles, fill them into YAML permanently.
-
-Recommended safe option:
+If you want stable UUIDs across future compiles, use:
 
 ```bash
 python src/contextCompiler.py --input Formats/sampleBuildFailureContext.yaml --fill-uuids --output-yaml output/sampleBuildFailureContextFilled.yaml
 ```
 
-This does four things:
+That flow:
 
-1. loads the source YAML
+1. loads the YAML
 2. fills blank `problem_uuid` values
-3. writes a filled YAML copy
-4. compiles the same content into `output/contextIndex.json`
+3. writes a filled YAML file
+4. compiles the same structure to `output/contextIndex.json`
 
-You can also write UUIDs back into the source file directly:
+If you really want to modify the source file directly:
 
 ```bash
 python src/contextCompiler.py --input Formats/sampleBuildFailureContext.yaml --fill-uuids --in-place
 ```
 
-Use `--in-place` carefully, since it changes the original file.
+Use `--in-place` carefully.
 
-Stable UUIDs are useful for:
+Stable `problem_uuid` values help with:
 
 - cleaner Git diffs
-- comparing compiled JSON between runs
-- tests
-- later references to the same problem mapping
+- comparing compiled outputs over time
+- downstream references
+- future tests
 
-## 6. Run the Router Script
+## 6. Route a Context Packet
 
 Run:
 
@@ -202,38 +230,45 @@ python src/contextRouter.py "Order Flow Issue Triage" --mode step --format txt
 
 Supported modes:
 
-- `step`: sort by step first
-- `weight`: sort by weight first
-- `yaml`: preserve raw YAML order
+- `step`
+- `weight`
+- `yaml`
+
+Current behavior by mode:
+
+- `step` sorts by `step_number`, then `weight`, then depth, then source order
+- `weight` sorts by `weight`, then `step_number`, then depth, then source order
+- `yaml` preserves authored traversal order
 
 Supported formats:
 
-- `txt`: plain text context only
-- `md`: Markdown with headings and metadata
-- `json`: machine-readable structured output
+- `txt`
+- `md`
+- `json`
 
-## 7. Get the Output
+Current behavior by format:
 
-The router prints the routed result to the terminal and writes it to a file in `output/contextPackets/`.
+- `txt` writes only the ordered text blocks
+- `md` writes a richer packet with headings and metadata
+- `json` writes a structured payload for another program to consume
 
-It does two things:
+## 7. Output Files
 
-- prints the routed output to the terminal
-- writes the same routed output to a file in `output/contextPackets/`
+The router prints the routed packet to the terminal and writes a file under:
 
-Example output file:
+`output/contextPackets/`
 
-`output/contextPackets/orderFlowIssueTriageStep.txt`
+Example outputs:
 
-Examples:
+- `output/contextPackets/orderFlowIssueTriageStep.txt`
+- `output/contextPackets/orderFlowIssueTriageStep.md`
+- `output/contextPackets/orderFlowIssueTriageStep.json`
 
-```bash
-python src/contextRouter.py "Order Flow Issue Triage" --mode step --format txt
-python src/contextRouter.py "Order Flow Issue Triage" --mode step --format md
-python src/contextRouter.py "Order Flow Issue Triage" --mode step --format json
-```
+The compiler output is:
 
-## Full End-to-End Command Flow
+- `output/contextIndex.json`
+
+## 8. Full End-to-End Example
 
 From the project root:
 
@@ -244,7 +279,7 @@ python src/contextCompiler.py --input Formats/sampleBuildFailureContext.yaml
 python src/contextRouter.py "Order Flow Issue Triage" --mode step --format txt
 ```
 
-Windows PowerShell version:
+Windows PowerShell:
 
 ```powershell
 .venv\Scripts\Activate.ps1
@@ -253,25 +288,35 @@ python .\src\contextCompiler.py --input .\Formats\sampleBuildFailureContext.yaml
 python .\src\contextRouter.py "Order Flow Issue Triage" --mode step --format txt
 ```
 
-## Output Files
+## 9. Current Demo Shape
 
-Compiled JSON index:
+The sample file is meant to show one context tree supporting multiple related
+problem flows.
 
-`output/contextIndex.json`
+Included sample problems:
 
-Routed text packet:
+- `Order Flow Issue Triage`
+- `Shipment Delay Investigation`
+- `Payment Failure Investigation`
+- `Inventory Shortage Investigation`
 
-`output/contextPackets/orderFlowIssueTriageStep.txt`
+That lets the same authored tree produce different packets depending on the
+problem name and routing mode.
 
-## Important Behavior Notes
+## 10. Current Gaps and Next Steps
 
-- `step` mode does not guarantee strict YAML source order if multiple items share the same step and have different weights.
-- If you want exact authored order, use:
+The most useful next steps for the repo are:
 
-```bash
-python src/contextRouter.py "Order Flow Issue Triage" --mode yaml
-```
+- add keyword routing
+- add a small focused test suite
+- improve packaging and CLI ergonomics
+- add a stronger demo comparing broad prompts to routed packets
+- add one real model integration later
 
-- If `problem_uuid` fields remain blank in the source YAML, new UUIDs are generated each time you recompile.
-- If you want stable `problem_uuid` values, use `--fill-uuids` and save the filled YAML output.
-- Duplicate `problem_uuid` values are now treated as validation errors.
+Good first tests would be:
+
+- compiler preserves hierarchy metadata
+- router returns the expected step order
+- weight mode sorts correctly
+- blank UUIDs are generated or filled correctly
+- packet output stays stable when source UUIDs are stable
