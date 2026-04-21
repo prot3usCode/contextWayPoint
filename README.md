@@ -162,6 +162,12 @@ The concise project framing lives in:
 
 - `docs/thesis.md`
 
+The pre-authoring design docs for a future visualizer branch live in:
+
+- `docs/projectModel.md`
+- `docs/sourceAnchoring.md`
+- `docs/examples/orderFulfillmentProject.example.json`
+
 The lightweight evaluation scaffold lives in:
 
 - `evals/README.md`

@@ -87,6 +87,67 @@ class ContextWayPointTests(unittest.TestCase):
             self.assertTrue(overview_entry["source_file"].endswith("domain.yaml"))
             self.assertTrue(payment_entry["source_file"].endswith("rules.yaml"))
 
+    def test_compile_directory_uses_sorted_files_and_global_source_order(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            contexts_dir = base / "contexts"
+            contexts_dir.mkdir()
+
+            write_text(
+                contexts_dir / "b_rules.yaml",
+                """
+                title: Rules
+                uuid: rules_root
+                text: Rule set.
+                problems:
+                  - problem_name: Demo Problem
+                    problem_uuid:
+                    step_number: 2
+                    weight: 20
+                    keywords:
+                      - rules
+                """,
+            )
+
+            write_text(
+                contexts_dir / "a_domain.yaml",
+                """
+                title: Domain
+                uuid: domain_root
+                text: Root domain context.
+                problems:
+                  - problem_name: Demo Problem
+                    problem_uuid:
+                    step_number: 1
+                    weight: 30
+                    keywords:
+                      - domain
+                entries:
+                  - title: Overview
+                    uuid: overview_section
+                    text: Start with the overview.
+                    problems:
+                      - problem_name: Demo Problem
+                        problem_uuid:
+                        step_number: 3
+                        weight: 10
+                        keywords:
+                          - overview
+                """,
+            )
+
+            output_file = base / "contextIndex.json"
+            compile_source(contexts_dir, output_file)
+            compiled_entries = json.loads(output_file.read_text(encoding="utf-8"))
+
+            self.assertEqual(
+                [entry["source_order"] for entry in compiled_entries],
+                [0, 1, 2],
+            )
+            self.assertTrue(compiled_entries[0]["source_file"].endswith("a_domain.yaml"))
+            self.assertTrue(compiled_entries[1]["source_file"].endswith("a_domain.yaml"))
+            self.assertTrue(compiled_entries[2]["source_file"].endswith("b_rules.yaml"))
+
     def test_step_mode_routes_in_step_order(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             base = Path(temp_dir)
@@ -321,6 +382,68 @@ class ContextWayPointTests(unittest.TestCase):
             self.assertIn("Source:", audit_text)
             self.assertIn("Keywords: root, overview", audit_text)
             self.assertIn("Keywords: payment, failed", audit_text)
+
+    def test_route_map_txt_output_is_deterministic(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            context_file = base / "demo.yaml"
+            output_file = base / "contextIndex.json"
+            packet_dir = base / "packets"
+
+            write_text(
+                context_file,
+                """
+                title: Demo Root
+                uuid: demo_root
+                text: Root context block.
+                problems:
+                  - problem_name: Demo Problem
+                    problem_uuid:
+                    step_number: 1
+                    weight: 25
+                    keywords:
+                      - root
+                entries:
+                  - title: Payment Check
+                    uuid: payment_check
+                    text: Payment context block.
+                    problems:
+                      - problem_name: Demo Problem
+                        problem_uuid:
+                        step_number: 2
+                        weight: 80
+                        keywords:
+                          - payment
+                """,
+            )
+
+            compile_source(context_file, output_file)
+
+            rendered_output, output_path, audit_path = route_and_write(
+                "Demo Problem",
+                mode="step",
+                output_format="txt",
+                route_only=True,
+                index_file=output_file,
+                output_dir=packet_dir,
+            )
+
+            expected_output = (
+                "Route Map: Demo Problem\n"
+                "Mode: step\n\n"
+                "1. Demo Root\n"
+                "   Step: 1\n"
+                f"   Source: {context_file}\n"
+                "   Path: Demo Root\n\n"
+                "2. Payment Check\n"
+                "   Step: 2\n"
+                f"   Source: {context_file}\n"
+                "   Path: Demo Root > Payment Check"
+            )
+
+            self.assertEqual(rendered_output, expected_output)
+            self.assertEqual(output_path.read_text(encoding="utf-8"), expected_output)
+            self.assertIsNone(audit_path)
 
     def test_fill_uuid_source_writes_nonblank_problem_uuids_for_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
