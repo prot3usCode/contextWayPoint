@@ -1,0 +1,42 @@
+# Copyright (c) 2026 Daniel Bueno
+# SPDX-License-Identifier: MIT
+# See LICENSE for the full license text.
+
+title: Ecommerce Order Fulfillment
+uuid: ecommerce_order_fulfillment_root
+problems:
+  - problem_name: Order Fulfillment Investigation
+    problem_uuid:
+    step_number: 1
+    weight: 100
+    keywords:
+      - order fulfillment
+      - blocked order
+      - payment
+      - shipment
+      - inventory
+
+text: >
+  Start with the authored overview of the fulfillment flow. This domain context
+  defines the order states, the relationship between payment, inventory, and
+  shipment, and the expectation that the investigation should move from broad
+  status to specific checks before returning to a final explanation.
+
+entries:
+  - title: Fulfillment Explanation Rules
+    uuid: fulfillment_explanation_rules
+    problems:
+      - problem_name: Order Fulfillment Investigation
+        problem_uuid:
+        step_number: 6
+        weight: 55
+        keywords:
+          - explain outcome
+          - root cause
+          - evidence
+          - narrative
+
+    text: >
+      End by translating the route into an explanation. The final answer should
+      tie the observed payment, inventory, and shipment evidence back to the
+      order state and explain which dependency blocked fulfillment.

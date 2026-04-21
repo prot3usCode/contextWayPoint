@@ -10,6 +10,36 @@ import yaml
 
 
 ValidationErrorList = list[str]
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+YAML_SUFFIXES = {".yaml", ".yml"}
+
+
+def display_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(PROJECT_ROOT))
+    except ValueError:
+        return str(path)
+
+
+def discover_yaml_files(input_dir: Path) -> list[Path]:
+    if not input_dir.exists():
+        raise ValueError(f"{input_dir} does not exist")
+
+    if not input_dir.is_dir():
+        raise ValueError(f"{input_dir} is not a directory")
+
+    yaml_files = sorted(
+        [
+            path
+            for path in input_dir.rglob("*")
+            if path.is_file() and path.suffix.lower() in YAML_SUFFIXES
+        ]
+    )
+
+    if not yaml_files:
+        raise ValueError(f"{input_dir} does not contain any YAML files")
+
+    return yaml_files
 
 
 def format_location(path: list[str]) -> str:
@@ -22,14 +52,21 @@ def is_blank(value: Any) -> bool:
     return value is None or (isinstance(value, str) and not value.strip())
 
 
+def qualify_location(document_label: str | None, location: str) -> str:
+    if is_blank(document_label):
+        return location
+    return f"{document_label} :: {location}"
+
+
 def validate_problem(
     problem: dict[str, Any],
     errors: ValidationErrorList,
     location: str,
     problem_index: int,
     seen_problem_uuids: set[str],
+    document_label: str | None = None,
 ) -> None:
-    prefix = f"{location} / problems[{problem_index}]"
+    prefix = qualify_location(document_label, f"{location} / problems[{problem_index}]")
 
     if not isinstance(problem, dict):
         errors.append(f"{prefix}: problem must be a mapping/object")
@@ -78,12 +115,15 @@ def validate_entry(
     seen_uuids: set[str],
     seen_problem_uuids: set[str],
     path: list[str] | None = None,
+    document_label: str | None = None,
 ) -> None:
     if path is None:
         path = []
 
     if not isinstance(entry, dict):
-        errors.append(f"{format_location(path)}: entry must be a mapping/object")
+        errors.append(
+            f"{qualify_location(document_label, format_location(path))}: entry must be a mapping/object"
+        )
         return
 
     title = entry.get("title")
@@ -92,27 +132,28 @@ def validate_entry(
     display_title = title if not is_blank(title) else "<missing title>"
     current_path = path + [str(display_title)]
     location = format_location(current_path)
+    qualified_location = qualify_location(document_label, location)
 
     if is_blank(title):
-        errors.append(f"{location}: missing title")
+        errors.append(f"{qualified_location}: missing title")
 
     if is_blank(entry_uuid):
-        errors.append(f"{location}: missing uuid")
+        errors.append(f"{qualified_location}: missing uuid")
     elif entry_uuid in seen_uuids:
-        errors.append(f"{location}: duplicate uuid '{entry_uuid}'")
+        errors.append(f"{qualified_location}: duplicate uuid '{entry_uuid}'")
     else:
         seen_uuids.add(entry_uuid)
 
     text = entry.get("text")
     if is_blank(text):
-        errors.append(f"{location}: blank text")
+        errors.append(f"{qualified_location}: blank text")
 
     problems = entry.get("problems", [])
     if problems is None:
         problems = []
 
     if not isinstance(problems, list):
-        errors.append(f"{location}: problems must be a list")
+        errors.append(f"{qualified_location}: problems must be a list")
     else:
         for problem_index, problem in enumerate(problems):
             validate_problem(
@@ -121,6 +162,7 @@ def validate_entry(
                 location,
                 problem_index,
                 seen_problem_uuids,
+                document_label=document_label,
             )
 
     children = entry.get("entries", [])
@@ -128,19 +170,62 @@ def validate_entry(
         children = []
 
     if not isinstance(children, list):
-        errors.append(f"{location}: entries must be a list")
+        errors.append(f"{qualified_location}: entries must be a list")
         return
 
     for child in children:
-        validate_entry(child, errors, seen_uuids, seen_problem_uuids, current_path)
+        validate_entry(
+            child,
+            errors,
+            seen_uuids,
+            seen_problem_uuids,
+            current_path,
+            document_label=document_label,
+        )
 
 
-def validate_context_tree(root: dict[str, Any]) -> ValidationErrorList:
+def validate_context_tree(
+    root: dict[str, Any],
+    document_label: str | None = None,
+    seen_uuids: set[str] | None = None,
+    seen_problem_uuids: set[str] | None = None,
+) -> ValidationErrorList:
+    errors: ValidationErrorList = []
+
+    if seen_uuids is None:
+        seen_uuids = set()
+
+    if seen_problem_uuids is None:
+        seen_problem_uuids = set()
+
+    validate_entry(
+        root,
+        errors,
+        seen_uuids,
+        seen_problem_uuids,
+        document_label=document_label,
+    )
+
+    return errors
+
+
+def validate_context_documents(
+    documents: list[tuple[Path, dict[str, Any]]],
+) -> ValidationErrorList:
     errors: ValidationErrorList = []
     seen_uuids: set[str] = set()
     seen_problem_uuids: set[str] = set()
 
-    validate_entry(root, errors, seen_uuids, seen_problem_uuids)
+    for input_file, root in documents:
+        document_label = display_path(input_file)
+        errors.extend(
+            validate_context_tree(
+                root,
+                document_label=document_label,
+                seen_uuids=seen_uuids,
+                seen_problem_uuids=seen_problem_uuids,
+            )
+        )
 
     return errors
 
@@ -160,7 +245,13 @@ def load_yaml(input_file: Path) -> dict[str, Any]:
 
 def validate_file(input_file: Path) -> ValidationErrorList:
     root = load_yaml(input_file)
-    return validate_context_tree(root)
+    return validate_context_tree(root, document_label=display_path(input_file))
+
+
+def validate_input_dir(input_dir: Path) -> tuple[list[Path], ValidationErrorList]:
+    input_files = discover_yaml_files(input_dir)
+    documents = [(input_file, load_yaml(input_file)) for input_file in input_files]
+    return input_files, validate_context_documents(documents)
 
 
 def print_validation_errors(errors: ValidationErrorList) -> None:
@@ -173,11 +264,16 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Validate a contextWayPoint YAML file."
     )
-    parser.add_argument(
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument(
         "--input",
         type=Path,
-        required=True,
         help="Input YAML-like context file to validate.",
+    )
+    input_group.add_argument(
+        "--input-dir",
+        type=Path,
+        help="Directory of YAML-like context files to validate together.",
     )
     return parser.parse_args()
 
@@ -186,7 +282,10 @@ def main() -> None:
     args = parse_args()
 
     try:
-        errors = validate_file(args.input)
+        if args.input is not None:
+            errors = validate_file(args.input)
+        else:
+            input_files, errors = validate_input_dir(args.input_dir)
     except ValueError as error:
         print("Validation failed:")
         print(f"- {error}")
@@ -196,7 +295,12 @@ def main() -> None:
         print_validation_errors(errors)
         raise SystemExit(1)
 
-    print(f"Validation passed: {args.input}")
+    if args.input is not None:
+        print(f"Validation passed: {display_path(args.input)}")
+    else:
+        print(
+            f"Validation passed: {len(input_files)} files from {display_path(args.input_dir)}"
+        )
 
 
 if __name__ == "__main__":

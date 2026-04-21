@@ -11,261 +11,160 @@ contextWayPoint is a lightweight context compiler and router for LLMs or agents.
 
 The main idea is:
 
-1. Write context as a structured outline.
+1. Author context as one YAML file or several related YAML files.
 2. Tag sections with one or more problem flows.
-3. Compile that outline into a flat JSON index.
-4. Route only the context needed for one problem.
-5. Output that routed context as txt, md, or json.
+3. Validate those files together.
+4. Compile them into one flat JSON index.
+5. Route only the entries needed for one problem.
+6. Render the result as a source-aware packet or a route map.
 
-Why it exists
--------------
-LLMs often fail when the context they receive is:
+The distinguishing claim is:
 
-- too broad
-- out of order
-- mixed across unrelated workflows
-- hard to trace back to a specific problem
-
-contextWayPoint narrows that down by letting you author context once and then
-generate smaller, ordered context packets for a specific problem.
+    RAG retrieves relevant chunks.
+    contextWayPoint defines and executes an authored route.
 
 
 High-Level Repository Flow
 --------------------------
 
-    Authored YAML
-         |
-         v
-    +-------------+
-    | Validator   |
-    | checks for  |
-    | missing or  |
-    | duplicate   |
-    | values      |
-    +-------------+
-         |
-         v
-    +-------------+
-    | Compiler    |
-    | flattens    |
-    | nested YAML |
-    | into JSON   |
-    +-------------+
-         |
-         v
+    Authored YAML files
+            |
+            v
+    +----------------+
+    | Validator      |
+    | checks fields, |
+    | UUIDs, and     |
+    | document-level |
+    | collisions     |
+    +----------------+
+            |
+            v
+    +----------------+
+    | Compiler       |
+    | flattens one   |
+    | file or many   |
+    | files into one |
+    | JSON index     |
+    +----------------+
+            |
+            v
     output/contextIndex.json
-         |
-         v
-    +-------------+
-    | Router      |
-    | selects and |
-    | sorts only  |
-    | relevant    |
-    | entries     |
-    +-------------+
-         |
-         v
+            |
+            v
+    +----------------+
+    | Router         |
+    | selects and    |
+    | sorts one      |
+    | problem route  |
+    +----------------+
+            |
+            v
     output/contextPackets/
-         |
-         +--> problemNameStep.txt
-         +--> problemNameStep.md
-         +--> problemNameStep.json
 
 
-Detailed Functional Flow
-------------------------
+What changed in the current code
+--------------------------------
 
-    Formats/sampleBuildFailureContext.yaml
-                |
-                v
-    src/contextValidator.py
-      - validates structure
-      - catches duplicate entry uuid values
-      - catches duplicate problem_uuid values
-      - checks required problem metadata
-                |
-                v
-    src/contextCompiler.py
-      - loads YAML
-      - optionally fills blank problem_uuid values
-      - preserves hierarchy metadata
-      - adds source_order
-      - writes output/contextIndex.json
-                |
-                v
-    src/contextRouter.py
-                |
-                v
-    src/queryContext.py
-      - matches entries by problem_name
-      - sorts by step, weight, or yaml order
-      - renders txt, md, or json output
-      - writes output/contextPackets/<packet>
+- Multi-document compile with `--input-dir`
+- One global index with `source_file` and `source_root`
+- Source-aware packet output
+- `keyword` routing mode
+- `--route-only` output
+- Cross-document UUID validation
+- A RAG comparison demo folder
 
 
-Core Files and What They Do
----------------------------
+Core Files
+----------
 
 README.md
-  High-level explanation of the project, why it exists, and how to run it.
+  High-level overview and quick-start commands.
 
 contextRouterWorkflow.md
-  Step-by-step runbook for setup, validation, compile, routing, and output.
+  Practical runbook for validation, compile, routing, and demo usage.
 
 src/contextValidator.py
-  Validates an authored YAML context file before compile.
+  Validates one file or a directory of YAML files together.
 
 src/contextCompiler.py
-  Compiles nested context into a flat JSON index and can fill blank problem UUIDs.
+  Compiles one file or many files into a flat JSON index and can fill blank
+  problem UUIDs for a single file.
 
 src/contextRouter.py
   Thin entry-point script for the router.
 
 src/queryContext.py
-  Main routing logic. Queries compiled JSON, sorts results, renders packets, and
-  writes output files.
+  Main routing logic. Matches entries by problem name, sorts by route mode,
+  renders packets, and writes output files.
 
-Formats/sampleBuildFailureContext.yaml
-  Sample authored context file. Despite the older filename, it currently models
-  order-flow troubleshooting rather than a build-failure workflow.
+Formats/
+  Sample authored context files, including a multi-document route example.
 
-Database/howToSetUpTestPostgres.md
-  Reference document used as source material for the sample data-flow example.
-
-output/contextIndex.json
-  Compiled flat index that the router reads.
-
-output/contextPackets/
-  Final routed packets written by the router.
+demos/rag_vs_contextwaypoint/
+  Explanation folder contrasting unordered retrieval with an authored route.
 
 
-How the Data Changes Shape
---------------------------
+Current Routing Modes
+---------------------
 
-Stage 1: authored YAML
+- step
+- weight
+- yaml
+- keyword
 
-    title: Order Flow Issue Triage
-    uuid: order_flow_issue_triage
-    problems:
-      - problem_name: Order Flow Issue Triage
-        step_number: 1
-        weight: 80
+Current Output Shapes
+---------------------
 
-This is hierarchical and easy for a human to author.
-
-Stage 2: compiled JSON
-
-    {
-      "uuid": "order_flow_issue_triage",
-      "title": "Order Flow Issue Triage",
-      "parent_uuid": null,
-      "depth": 0,
-      "path": ["Order Flow Issue Triage"],
-      "source_order": 0,
-      "text": "...",
-      "problems": [...]
-    }
-
-This is flat and easy for a program to query.
-
-Stage 3: routed packet
-
-    This context covers how to troubleshoot issues in the sample order data flow...
-
-    Start with a single order and build a joined view across orders, customers,
-    payments, and shipments...
-
-This is compact and easy for an LLM or agent to consume.
-
-
-Current Features
-----------------
-
-- Validate YAML before compile
-- Detect duplicate entry uuid values
-- Detect duplicate problem_uuid values
-- Fill blank problem_uuid values
-- Compile nested context into flat JSON
-- Preserve traversal order with source_order
-- Route by step
-- Route by weight
-- Route by authored YAML order
-- Output txt
-- Output md
-- Output json
-- Support multiple problem paths through the same tree
-
-
-Current Example Problems
-------------------------
-
-- Order Flow Issue Triage
-- Shipment Delay Investigation
-- Payment Failure Investigation
-- Inventory Shortage Investigation
-
-These all route through the same authored tree, but they select different
-sections and orderings.
+- txt
+- md
+- json
+- route-only variants
 
 
 Typical Commands
 ----------------
 
-Validate:
+Validate all example files together:
 
-    python src/contextValidator.py --input Formats/sampleBuildFailureContext.yaml
+    .venv/bin/python src/contextValidator.py --input-dir Formats
 
-Compile:
+Compile them into one global index:
 
-    python src/contextCompiler.py --input Formats/sampleBuildFailureContext.yaml
+    .venv/bin/python src/contextCompiler.py --input-dir Formats
 
-Compile and fill UUIDs:
+Render the cross-document packet:
 
-    python src/contextCompiler.py --input Formats/sampleBuildFailureContext.yaml --fill-uuids --output-yaml output/sampleBuildFailureContextFilled.yaml
+    .venv/bin/python src/contextRouter.py "Order Fulfillment Investigation" --mode step --format md
 
-Route a context packet:
+Print only the route map:
 
-    python src/contextRouter.py "Order Flow Issue Triage" --mode step --format txt
+    .venv/bin/python src/contextRouter.py "Order Fulfillment Investigation" --mode step --route-only --format txt
 
+Use keyword mode:
 
-End-to-End Example
-------------------
-
-    source .venv/bin/activate
-    python src/contextValidator.py --input Formats/sampleBuildFailureContext.yaml
-    python src/contextCompiler.py --input Formats/sampleBuildFailureContext.yaml
-    python src/contextRouter.py "Order Flow Issue Triage" --mode step --format txt
+    .venv/bin/python src/contextRouter.py "Order Fulfillment Investigation" --mode keyword --keywords payment failed shipment --format txt
 
 
-What the Repository Demonstrates
+What the repository demonstrates
 --------------------------------
 
 At its core, the repository demonstrates this pattern:
 
-    broad documentation
-           ->
+    broad documentation or retrieved chunks
+               ->
     authored structured context
-           ->
+               ->
     compiled queryable index
-           ->
-    smaller routed context packet
-           ->
+               ->
+    routed, traceable problem packet
+               ->
     better-targeted LLM input
 
 
-What Is Still Missing
+What is still missing
 ---------------------
 
-- keyword routing mode
 - automated tests
-- packaging as an installable CLI tool
-- evals comparing routed context to a baseline prompt
-- one real downstream model integration
-
-
-Short Summary
--------------
-contextWayPoint is a small system for turning authored context into deterministic,
-problem-specific context packets. The validator protects the source structure,
-the compiler creates a queryable JSON index, and the router turns that index
-into smaller outputs that are easier for an LLM or agent to use correctly.
+- packaging / installable CLI
+- evals
+- downstream model integrations

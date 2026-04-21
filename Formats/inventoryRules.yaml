@@ -1,0 +1,30 @@
+# Copyright (c) 2026 Daniel Bueno
+# SPDX-License-Identifier: MIT
+# See LICENSE for the full license text.
+
+title: Inventory Rules
+uuid: inventory_rules_root
+text: >
+  Inventory checks are separated from payment and shipment logic so the route can
+  combine stock evidence with other rule sets only when the current problem needs
+  it.
+
+entries:
+  - title: Inventory Availability Check
+    uuid: inventory_availability_check
+    problems:
+      - problem_name: Order Fulfillment Investigation
+        problem_uuid:
+        step_number: 4
+        weight: 90
+        keywords:
+          - inventory
+          - available quantity
+          - allocation
+          - stock
+          - shortage
+
+    text: >
+      Compare ordered quantities against available and reserved inventory. A paid
+      order without enough stock should remain blocked before shipment creation,
+      even when the payment path itself looks healthy.

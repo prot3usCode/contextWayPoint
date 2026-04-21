@@ -35,6 +35,41 @@ def find_matching_problem(
     return None
 
 
+def normalize_tokens(values: list[str]) -> set[str]:
+    tokens: set[str] = set()
+
+    for value in values:
+        for token in re.split(r"[^A-Za-z0-9]+", value.lower()):
+            if token:
+                tokens.add(token)
+
+    return tokens
+
+
+def problem_keywords(problem: dict[str, Any]) -> list[str]:
+    keywords = problem.get("keywords", [])
+    if not isinstance(keywords, list):
+        return []
+    return [str(keyword) for keyword in keywords if keyword is not None]
+
+
+def score_keyword_overlap(item: dict[str, Any], query_keywords: list[str]) -> int:
+    query_tokens = normalize_tokens(query_keywords)
+    if not query_tokens:
+        return 0
+
+    searchable_values = [
+        item.get("title", ""),
+        item.get("text", ""),
+        item.get("source_root", ""),
+    ]
+    searchable_values.extend(str(part) for part in item.get("path", []))
+    searchable_values.extend(problem_keywords(item["matched_problem"]))
+
+    searchable_tokens = normalize_tokens(searchable_values)
+    return len(query_tokens & searchable_tokens)
+
+
 def query_by_problem(
     problem_name: str,
     index_file: Path = INDEX_FILE,
@@ -44,22 +79,59 @@ def query_by_problem(
 
     for fallback_order, entry in enumerate(index):
         matched_problem = find_matching_problem(entry, problem_name)
+        if not matched_problem:
+            continue
 
-        if matched_problem:
-            results.append(
-                {
-                    "uuid": entry["uuid"],
-                    "title": entry["title"],
-                    "parent_uuid": entry.get("parent_uuid"),
-                    "depth": entry.get("depth", 0),
-                    "path": entry.get("path", []),
-                    "text": entry.get("text", "").strip(),
-                    "source_order": entry.get("source_order", fallback_order),
-                    "matched_problem": matched_problem,
-                }
-            )
+        path = entry.get("path", [])
+        source_root = entry.get("source_root")
+        if not source_root and isinstance(path, list) and path:
+            source_root = path[0]
+
+        results.append(
+            {
+                "uuid": entry["uuid"],
+                "title": entry["title"],
+                "parent_uuid": entry.get("parent_uuid"),
+                "depth": entry.get("depth", 0),
+                "path": path,
+                "text": entry.get("text", "").strip(),
+                "source_order": entry.get("source_order", fallback_order),
+                "source_file": entry.get("source_file", "<unknown source>"),
+                "source_root": source_root or entry.get("title", ""),
+                "matched_problem": matched_problem,
+            }
+        )
 
     return results
+
+
+def annotate_keyword_scores(
+    results: list[dict[str, Any]],
+    query_keywords: list[str] | None,
+) -> list[dict[str, Any]]:
+    keywords = query_keywords or []
+    annotated_results: list[dict[str, Any]] = []
+
+    for item in results:
+        annotated_item = dict(item)
+        annotated_item["keyword_score"] = score_keyword_overlap(item, keywords)
+        annotated_results.append(annotated_item)
+
+    return annotated_results
+
+
+def step_sort_value(item: dict[str, Any]) -> int:
+    step_number = item["matched_problem"].get("step_number")
+    if isinstance(step_number, int):
+        return step_number
+    return 999999
+
+
+def weight_sort_value(item: dict[str, Any]) -> float:
+    weight = item["matched_problem"].get("weight")
+    if isinstance(weight, (int, float)):
+        return float(weight)
+    return 0
 
 
 def sort_results(results: list[dict[str, Any]], mode: str) -> list[dict[str, Any]]:
@@ -67,8 +139,8 @@ def sort_results(results: list[dict[str, Any]], mode: str) -> list[dict[str, Any
         return sorted(
             results,
             key=lambda item: (
-                item["matched_problem"].get("step_number", 999999),
-                -item["matched_problem"].get("weight", 0),
+                step_sort_value(item),
+                -weight_sort_value(item),
                 item.get("depth", 0),
                 item.get("source_order", 999999),
             ),
@@ -78,8 +150,8 @@ def sort_results(results: list[dict[str, Any]], mode: str) -> list[dict[str, Any
         return sorted(
             results,
             key=lambda item: (
-                -item["matched_problem"].get("weight", 0),
-                item["matched_problem"].get("step_number", 999999),
+                -weight_sort_value(item),
+                step_sort_value(item),
                 item.get("depth", 0),
                 item.get("source_order", 999999),
             ),
@@ -87,6 +159,18 @@ def sort_results(results: list[dict[str, Any]], mode: str) -> list[dict[str, Any
 
     if mode == "yaml":
         return sorted(results, key=lambda item: item.get("source_order", 999999))
+
+    if mode == "keyword":
+        return sorted(
+            results,
+            key=lambda item: (
+                -item.get("keyword_score", 0),
+                step_sort_value(item),
+                -weight_sort_value(item),
+                item.get("depth", 0),
+                item.get("source_order", 999999),
+            ),
+        )
 
     raise ValueError(f"Unsupported mode: {mode}")
 
@@ -101,53 +185,157 @@ def to_camel_case(text: str) -> str:
     return words[0].lower() + "".join(word[:1].upper() + word[1:] for word in words[1:])
 
 
-def format_results_as_text(results: list[dict[str, Any]]) -> str:
-    if not results:
-        return ""
+def build_intro_lines(
+    problem_name: str,
+    mode: str,
+    route_only: bool,
+    query_keywords: list[str] | None = None,
+) -> list[str]:
+    lines = [
+        f"{'Route Map' if route_only else 'Context Packet'}: {problem_name}",
+        f"Mode: {mode}",
+    ]
 
-    text_blocks = [item["text"] for item in results if item.get("text")]
-    return "\n\n".join(text_blocks)
+    if mode == "keyword" and query_keywords:
+        lines.append(f"Keywords: {', '.join(query_keywords)}")
+
+    return lines + [""]
+
+
+def entry_path_text(item: dict[str, Any]) -> str:
+    return " > ".join(str(part) for part in item.get("path", []))
+
+
+def text_route_label(item: dict[str, Any], route_position: int) -> str:
+    return f"{route_position}. {item['title']}"
+
+
+def step_heading(item: dict[str, Any]) -> str:
+    step_number = item["matched_problem"].get("step_number")
+    if step_number is None:
+        return item["title"]
+    return f"Step {step_number} - {item['title']}"
+
+
+def append_packet_metadata_lines(
+    lines: list[str],
+    item: dict[str, Any],
+    mode: str,
+) -> None:
+    lines.append(f"Source: {item['source_file']}")
+    lines.append(f"Path: {entry_path_text(item)}")
+    lines.append(f"Weight: {item['matched_problem'].get('weight')}")
+
+    if mode == "keyword":
+        lines.append(f"Keyword Score: {item.get('keyword_score', 0)}")
+
+
+def append_route_metadata_lines(
+    lines: list[str],
+    item: dict[str, Any],
+    route_position: int,
+    mode: str,
+) -> None:
+    lines.append(text_route_label(item, route_position))
+
+    step_number = item["matched_problem"].get("step_number")
+    if step_number is not None:
+        lines.append(f"   Step: {step_number}")
+
+    lines.append(f"   Source: {item['source_file']}")
+    lines.append(f"   Path: {entry_path_text(item)}")
+
+    if mode == "keyword":
+        lines.append(f"   Keyword Score: {item.get('keyword_score', 0)}")
+
+
+def format_results_as_text(
+    results: list[dict[str, Any]],
+    problem_name: str,
+    mode: str,
+    route_only: bool = False,
+    query_keywords: list[str] | None = None,
+) -> str:
+    lines = build_intro_lines(problem_name, mode, route_only, query_keywords)
+
+    if not results:
+        lines.append(f"No {'route' if route_only else 'context'} found.")
+        return "\n".join(lines).strip()
+
+    for route_position, item in enumerate(results, start=1):
+        if route_only:
+            append_route_metadata_lines(lines, item, route_position, mode)
+            lines.append("")
+            continue
+
+        lines.append(step_heading(item))
+        append_packet_metadata_lines(lines, item, mode)
+        lines.extend(["", item.get("text", ""), ""])
+
+    return "\n".join(lines).strip()
 
 
 def format_results_as_markdown(
     results: list[dict[str, Any]],
     problem_name: str,
     mode: str,
+    route_only: bool = False,
+    query_keywords: list[str] | None = None,
 ) -> str:
     lines = [
-        f"# Context Packet: {problem_name}",
+        f"# {'Route Map' if route_only else 'Context Packet'}: {problem_name}",
         "",
         f"Mode: `{mode}`",
         "",
     ]
 
+    if mode == "keyword" and query_keywords:
+        lines.extend([f"Keywords: `{', '.join(query_keywords)}`", ""])
+
     if not results:
-        lines.append("No context found.")
+        lines.append(f"No {'route' if route_only else 'context'} found.")
         return "\n".join(lines)
 
-    for item in results:
-        problem = item["matched_problem"]
-        step_number = problem.get("step_number")
-        weight = problem.get("weight")
-        path = " > ".join(item.get("path", []))
-        keywords = problem.get("keywords", [])
+    for route_position, item in enumerate(results, start=1):
+        if route_only:
+            lines.extend(
+                [
+                    f"{route_position}. **{item['title']}**",
+                    "",
+                ]
+            )
+
+            step_number = item["matched_problem"].get("step_number")
+            if step_number is not None:
+                lines.append(f"Step: `{step_number}`  ")
+
+            lines.extend(
+                [
+                    f"Source: `{item['source_file']}`  ",
+                    f"Path: `{entry_path_text(item)}`",
+                ]
+            )
+
+            if mode == "keyword":
+                lines.append(f"Keyword Score: `{item.get('keyword_score', 0)}`")
+
+            lines.append("")
+            continue
 
         lines.extend(
             [
-                f"## Step {step_number} - {item['title']}",
+                f"## {step_heading(item)}",
                 "",
-                f"**Weight:** {weight}",
-                "",
+                f"Source: `{item['source_file']}`  ",
+                f"Path: `{entry_path_text(item)}`  ",
+                f"Weight: `{item['matched_problem'].get('weight')}`",
             ]
         )
 
-        if path:
-            lines.extend([f"**Path:** `{path}`", ""])
+        if mode == "keyword":
+            lines.append(f"Keyword Score: `{item.get('keyword_score', 0)}`")
 
-        if keywords:
-            lines.extend([f"**Keywords:** {', '.join(keywords)}", ""])
-
-        lines.extend([item.get("text", ""), ""])
+        lines.extend(["", item.get("text", ""), ""])
 
     return "\n".join(lines).strip()
 
@@ -156,29 +344,41 @@ def build_json_payload(
     results: list[dict[str, Any]],
     problem_name: str,
     mode: str,
+    route_only: bool = False,
+    query_keywords: list[str] | None = None,
 ) -> dict[str, Any]:
     entries: list[dict[str, Any]] = []
 
-    for item in results:
+    for route_position, item in enumerate(results, start=1):
         problem = item["matched_problem"]
-        entries.append(
-            {
-                "title": item["title"],
-                "uuid": item["uuid"],
-                "parent_uuid": item.get("parent_uuid"),
-                "depth": item.get("depth", 0),
-                "path": item.get("path", []),
-                "step_number": problem.get("step_number"),
-                "weight": problem.get("weight"),
-                "problem_uuid": problem.get("problem_uuid"),
-                "keywords": problem.get("keywords", []),
-                "text": item.get("text", ""),
-            }
-        )
+        entry_payload = {
+            "route_position": route_position,
+            "title": item["title"],
+            "uuid": item["uuid"],
+            "parent_uuid": item.get("parent_uuid"),
+            "depth": item.get("depth", 0),
+            "path": item.get("path", []),
+            "source_file": item.get("source_file"),
+            "source_root": item.get("source_root"),
+            "step_number": problem.get("step_number"),
+            "weight": problem.get("weight"),
+            "problem_uuid": problem.get("problem_uuid"),
+            "keywords": problem_keywords(problem),
+        }
+
+        if mode == "keyword":
+            entry_payload["keyword_score"] = item.get("keyword_score", 0)
+
+        if not route_only:
+            entry_payload["text"] = item.get("text", "")
+
+        entries.append(entry_payload)
 
     return {
         "problem_name": problem_name,
         "mode": mode,
+        "route_only": route_only,
+        "keywords_used": query_keywords or [],
         "entry_count": len(entries),
         "entries": entries,
     }
@@ -188,9 +388,17 @@ def format_results_as_json(
     results: list[dict[str, Any]],
     problem_name: str,
     mode: str,
+    route_only: bool = False,
+    query_keywords: list[str] | None = None,
 ) -> str:
     return json.dumps(
-        build_json_payload(results, problem_name, mode),
+        build_json_payload(
+            results,
+            problem_name,
+            mode,
+            route_only=route_only,
+            query_keywords=query_keywords,
+        ),
         indent=2,
     )
 
@@ -200,17 +408,35 @@ def render_results(
     problem_name: str,
     mode: str,
     output_format: str,
+    route_only: bool = False,
+    query_keywords: list[str] | None = None,
 ) -> str:
     if output_format == "txt":
-        if not results:
-            return f"No context found for problem: {problem_name}"
-        return format_results_as_text(results)
+        return format_results_as_text(
+            results,
+            problem_name,
+            mode,
+            route_only=route_only,
+            query_keywords=query_keywords,
+        )
 
     if output_format == "md":
-        return format_results_as_markdown(results, problem_name, mode)
+        return format_results_as_markdown(
+            results,
+            problem_name,
+            mode,
+            route_only=route_only,
+            query_keywords=query_keywords,
+        )
 
     if output_format == "json":
-        return format_results_as_json(results, problem_name, mode)
+        return format_results_as_json(
+            results,
+            problem_name,
+            mode,
+            route_only=route_only,
+            query_keywords=query_keywords,
+        )
 
     raise ValueError(f"Unsupported format: {output_format}")
 
@@ -220,6 +446,8 @@ def write_results_to_file(
     problem_name: str,
     mode: str,
     output_format: str,
+    route_only: bool = False,
+    query_keywords: list[str] | None = None,
     output_dir: Path = OUTPUT_DIR,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -230,12 +458,20 @@ def write_results_to_file(
         "json": "json",
     }
     extension = extension_by_format[output_format]
+    suffix = "Route" if route_only else ""
     file_name = (
-        f"{to_camel_case(problem_name)}{mode[:1].upper() + mode[1:]}.{extension}"
+        f"{to_camel_case(problem_name)}{mode[:1].upper() + mode[1:]}{suffix}.{extension}"
     )
     output_path = output_dir / file_name
 
-    output_text = render_results(results, problem_name, mode, output_format)
+    output_text = render_results(
+        results,
+        problem_name,
+        mode,
+        output_format,
+        route_only=route_only,
+        query_keywords=query_keywords,
+    )
 
     with output_path.open("w", encoding="utf-8") as file_handle:
         file_handle.write(output_text)
@@ -248,8 +484,19 @@ def print_results(
     problem_name: str,
     mode: str,
     output_format: str,
+    route_only: bool = False,
+    query_keywords: list[str] | None = None,
 ) -> None:
-    print(render_results(results, problem_name, mode, output_format))
+    print(
+        render_results(
+            results,
+            problem_name,
+            mode,
+            output_format,
+            route_only=route_only,
+            query_keywords=query_keywords,
+        )
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -262,15 +509,25 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--mode",
-        choices=("step", "weight", "yaml"),
+        choices=("step", "weight", "yaml", "keyword"),
         default="step",
-        help="Sort by step, weight, or raw YAML traversal order.",
+        help="Sort by step, weight, raw YAML traversal order, or keyword overlap.",
+    )
+    parser.add_argument(
+        "--keywords",
+        nargs="+",
+        help="Keywords to score during keyword mode.",
     )
     parser.add_argument(
         "--format",
         choices=("txt", "md", "json"),
         default="txt",
         help="Render the routed packet as plain text, Markdown, or JSON.",
+    )
+    parser.add_argument(
+        "--route-only",
+        action="store_true",
+        help="Render only the route map without the full context text.",
     )
     parser.add_argument(
         "--index-file",
@@ -284,7 +541,15 @@ def parse_args() -> argparse.Namespace:
         default=OUTPUT_DIR,
         help=f"Directory for generated context packets. Default: {OUTPUT_DIR}",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    if args.mode == "keyword" and not args.keywords:
+        parser.error("--keywords is required when --mode keyword is used")
+
+    if args.mode != "keyword" and args.keywords:
+        parser.error("--keywords can only be used with --mode keyword")
+
+    return args
 
 
 def main() -> None:
@@ -293,18 +558,32 @@ def main() -> None:
         problem_name=args.problem_name,
         index_file=args.index_file,
     )
+
+    if args.mode == "keyword":
+        results = annotate_keyword_scores(results, args.keywords)
+
     sorted_results = sort_results(results, args.mode)
 
-    print_results(sorted_results, args.problem_name, args.mode, args.format)
+    print_results(
+        sorted_results,
+        args.problem_name,
+        args.mode,
+        args.format,
+        route_only=args.route_only,
+        query_keywords=args.keywords,
+    )
 
     output_path = write_results_to_file(
         sorted_results,
         args.problem_name,
         args.mode,
         args.format,
+        route_only=args.route_only,
+        query_keywords=args.keywords,
         output_dir=args.output_dir,
     )
-    print(f"\nWrote context packet to: {display_path(output_path)}")
+    output_label = "route map" if args.route_only else "context packet"
+    print(f"\nWrote {output_label} to: {display_path(output_path)}")
 
 
 if __name__ == "__main__":

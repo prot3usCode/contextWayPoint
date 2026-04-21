@@ -1,0 +1,30 @@
+# Copyright (c) 2026 Daniel Bueno
+# SPDX-License-Identifier: MIT
+# See LICENSE for the full license text.
+
+title: Shipment Rules
+uuid: shipment_rules_root
+text: >
+  Shipment checks are authored separately so the route can distinguish between a
+  fulfillment problem caused by upstream dependencies and one caused by the
+  shipment workflow itself.
+
+entries:
+  - title: Shipment Check
+    uuid: shipment_check
+    problems:
+      - problem_name: Order Fulfillment Investigation
+        problem_uuid:
+        step_number: 5
+        weight: 88
+        keywords:
+          - shipment
+          - delayed
+          - tracking
+          - label
+          - dispatched
+
+    text: >
+      Inspect the shipment state only after payment and inventory checks pass.
+      Missing shipment rows, stale labels, or delayed shipment statuses indicate
+      that the issue has moved into the fulfillment or carrier handoff stage.
