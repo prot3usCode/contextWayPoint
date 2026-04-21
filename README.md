@@ -36,6 +36,7 @@ retrieval. The missing piece is the intended path through the context.
 - fill blank `problem_uuid` values for one file or a directory tree
 - route context by `step`, `weight`, raw authored order, or `keyword`
 - render source-aware packets as `txt`, `md`, or `json`
+- write a companion audit file for `txt` packet output
 - render `route-map` output without the full context body
 - run a one-command demo that compares unordered retrieval to an authored route
 
@@ -94,6 +95,18 @@ Route a full context packet:
 ```bash
 contextwaypoint route "Order Fulfillment Investigation" --mode step --format md
 ```
+
+Route a plain text context packet plus companion audit file:
+
+```bash
+contextwaypoint route "Order Fulfillment Investigation" --mode step --format txt
+```
+
+That `txt` route writes:
+
+- a context-only packet for direct LLM or human consumption
+- a companion `Audit.txt` file with step labels, source, path, weight, UUIDs,
+  and keywords
 
 Render only the route map:
 

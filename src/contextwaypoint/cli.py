@@ -48,7 +48,7 @@ def command_fill_uuids(args: argparse.Namespace) -> int:
 
 
 def command_route(args: argparse.Namespace) -> int:
-    rendered_output, output_path = route_and_write(
+    rendered_output, output_path, audit_path = route_and_write(
         args.problem_name,
         args.mode,
         args.format,
@@ -59,11 +59,13 @@ def command_route(args: argparse.Namespace) -> int:
     )
     print(rendered_output)
     print(f"\nWrote context packet to: {display_path(output_path)}")
+    if audit_path is not None:
+        print(f"Wrote audit packet to: {display_path(audit_path)}")
     return 0
 
 
 def command_route_map(args: argparse.Namespace) -> int:
-    rendered_output, output_path = route_and_write(
+    rendered_output, output_path, _ = route_and_write(
         args.problem_name,
         args.mode,
         args.format,

@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 
 from contextwaypoint.compiler import compile_source, fill_uuid_source
-from contextwaypoint.router import route_problem
+from contextwaypoint.router import route_and_write, route_problem
 
 
 def write_text(path: Path, contents: str) -> None:
@@ -257,6 +257,70 @@ class ContextWayPointTests(unittest.TestCase):
 
             self.assertEqual(routed_results[0]["title"], "Payment Check")
             self.assertGreater(routed_results[0]["keyword_score"], routed_results[1]["keyword_score"])
+
+    def test_txt_route_writes_context_only_and_companion_audit_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            context_file = base / "demo.yaml"
+            output_file = base / "contextIndex.json"
+            packet_dir = base / "packets"
+
+            write_text(
+                context_file,
+                """
+                title: Demo Root
+                uuid: demo_root
+                text: Root context block.
+                problems:
+                  - problem_name: Demo Problem
+                    problem_uuid:
+                    step_number: 1
+                    weight: 25
+                    keywords:
+                      - root
+                      - overview
+                entries:
+                  - title: Payment Check
+                    uuid: payment_check
+                    text: Payment context block.
+                    problems:
+                      - problem_name: Demo Problem
+                        problem_uuid:
+                        step_number: 2
+                        weight: 80
+                        keywords:
+                          - payment
+                          - failed
+                """,
+            )
+
+            compile_source(context_file, output_file)
+
+            rendered_output, output_path, audit_path = route_and_write(
+                "Demo Problem",
+                mode="step",
+                output_format="txt",
+                route_only=False,
+                index_file=output_file,
+                output_dir=packet_dir,
+            )
+
+            self.assertEqual(
+                rendered_output,
+                "Root context block.\n\nPayment context block.",
+            )
+            self.assertEqual(output_path.read_text(encoding="utf-8"), rendered_output)
+            self.assertIsNotNone(audit_path)
+
+            assert audit_path is not None
+            audit_text = audit_path.read_text(encoding="utf-8")
+
+            self.assertNotIn("Step 1 - Demo Root", rendered_output)
+            self.assertNotIn("Source:", rendered_output)
+            self.assertIn("Step 1 - Demo Root", audit_text)
+            self.assertIn("Source:", audit_text)
+            self.assertIn("Keywords: root, overview", audit_text)
+            self.assertIn("Keywords: payment, failed", audit_text)
 
     def test_fill_uuid_source_writes_nonblank_problem_uuids_for_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

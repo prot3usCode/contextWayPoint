@@ -226,14 +226,27 @@ def step_heading(item: dict[str, Any]) -> str:
     return f"Step {step_number} - {item['title']}"
 
 
-def append_packet_metadata_lines(
+def entry_keywords_text(item: dict[str, Any]) -> str:
+    keywords = problem_keywords(item["matched_problem"])
+    return ", ".join(keywords)
+
+
+def append_audit_metadata_lines(
     lines: list[str],
     item: dict[str, Any],
     mode: str,
+    route_position: int,
 ) -> None:
+    lines.append(f"Route Position: {route_position}")
+    lines.append(f"Entry UUID: {item['uuid']}")
     lines.append(f"Source: {item['source_file']}")
     lines.append(f"Path: {entry_path_text(item)}")
     lines.append(f"Weight: {item['matched_problem'].get('weight')}")
+    lines.append(f"Problem UUID: {item['matched_problem'].get('problem_uuid')}")
+
+    keywords_text = entry_keywords_text(item)
+    if keywords_text:
+        lines.append(f"Keywords: {keywords_text}")
 
     if mode == "keyword":
         lines.append(f"Keyword Score: {item.get('keyword_score', 0)}")
@@ -265,20 +278,44 @@ def format_results_as_text(
     route_only: bool = False,
     query_keywords: list[str] | None = None,
 ) -> str:
-    lines = build_intro_lines(problem_name, mode, route_only, query_keywords)
+    if route_only:
+        lines = build_intro_lines(problem_name, mode, route_only, query_keywords)
+
+        if not results:
+            lines.append("No route found.")
+            return "\n".join(lines).strip()
+
+        for route_position, item in enumerate(results, start=1):
+            append_route_metadata_lines(lines, item, route_position, mode)
+            lines.append("")
+
+        return "\n".join(lines).strip()
 
     if not results:
-        lines.append(f"No {'route' if route_only else 'context'} found.")
+        return f"No context found for problem: {problem_name}"
+
+    text_blocks = [item.get("text", "") for item in results if item.get("text", "")]
+    if not text_blocks:
+        return f"No context found for problem: {problem_name}"
+
+    return "\n\n".join(text_blocks).strip()
+
+
+def format_results_as_audit_text(
+    results: list[dict[str, Any]],
+    problem_name: str,
+    mode: str,
+    query_keywords: list[str] | None = None,
+) -> str:
+    lines = build_intro_lines(problem_name, mode, route_only=False, query_keywords=query_keywords)
+
+    if not results:
+        lines.append(f"No context found for problem: {problem_name}")
         return "\n".join(lines).strip()
 
     for route_position, item in enumerate(results, start=1):
-        if route_only:
-            append_route_metadata_lines(lines, item, route_position, mode)
-            lines.append("")
-            continue
-
         lines.append(step_heading(item))
-        append_packet_metadata_lines(lines, item, mode)
+        append_audit_metadata_lines(lines, item, mode, route_position)
         lines.extend(["", item.get("text", ""), ""])
 
     return "\n".join(lines).strip()
@@ -488,6 +525,30 @@ def write_results_to_file(
     return output_path
 
 
+def write_audit_results_to_file(
+    results: list[dict[str, Any]],
+    problem_name: str,
+    mode: str,
+    query_keywords: list[str] | None = None,
+    output_dir: Path = DEFAULT_PACKET_DIR,
+) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    file_name = f"{to_camel_case(problem_name)}{mode[:1].upper() + mode[1:]}Audit.txt"
+    output_path = output_dir / file_name
+    output_text = format_results_as_audit_text(
+        results,
+        problem_name,
+        mode,
+        query_keywords=query_keywords,
+    )
+
+    with output_path.open("w", encoding="utf-8") as file_handle:
+        file_handle.write(output_text)
+
+    return output_path
+
+
 def route_and_write(
     problem_name: str,
     mode: str,
@@ -496,7 +557,7 @@ def route_and_write(
     index_file: Path = DEFAULT_INDEX_FILE,
     output_dir: Path = DEFAULT_PACKET_DIR,
     keywords: list[str] | None = None,
-) -> tuple[str, Path]:
+) -> tuple[str, Path, Path | None]:
     results = route_problem(
         problem_name,
         mode=mode,
@@ -520,7 +581,18 @@ def route_and_write(
         query_keywords=keywords,
         output_dir=output_dir,
     )
-    return rendered_output, output_path
+
+    audit_path = None
+    if output_format == "txt" and not route_only:
+        audit_path = write_audit_results_to_file(
+            results,
+            problem_name,
+            mode,
+            query_keywords=keywords,
+            output_dir=output_dir,
+        )
+
+    return rendered_output, output_path, audit_path
 
 
 def build_legacy_parser() -> argparse.ArgumentParser:
@@ -578,7 +650,7 @@ def legacy_main(argv: Sequence[str] | None = None) -> None:
     if args.mode != "keyword" and args.keywords:
         parser.error("--keywords can only be used with --mode keyword")
 
-    rendered_output, output_path = route_and_write(
+    rendered_output, output_path, audit_path = route_and_write(
         args.problem_name,
         args.mode,
         args.format,
@@ -591,3 +663,5 @@ def legacy_main(argv: Sequence[str] | None = None) -> None:
     print(rendered_output)
     output_label = "route map" if args.route_only else "context packet"
     print(f"\nWrote {output_label} to: {display_path(output_path)}")
+    if audit_path is not None:
+        print(f"Wrote audit packet to: {display_path(audit_path)}")

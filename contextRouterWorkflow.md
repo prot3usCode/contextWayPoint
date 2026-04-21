@@ -137,6 +137,18 @@ Render a full packet:
 contextwaypoint route "Order Fulfillment Investigation" --mode step --format md
 ```
 
+Render a plain text packet:
+
+```bash
+contextwaypoint route "Order Fulfillment Investigation" --mode step --format txt
+```
+
+When you use `--format txt`, the router writes two files:
+
+- the main `.txt` packet with only the ordered context text
+- a companion `Audit.txt` file with step labels, source, path, weight, UUIDs,
+  keywords, and keyword score when relevant
+
 Render only the route map:
 
 ```bash
