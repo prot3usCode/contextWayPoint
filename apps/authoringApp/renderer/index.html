@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>contextWayPoint Authoring App</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="topbar__identity">
+          <p class="eyebrow">contextWayPoint</p>
+          <h1>Authoring Shell</h1>
+          <p class="subtitle">
+            Edit project-state on the left. Watch generated YAML update on the
+            right.
+          </p>
+        </div>
+
+        <div class="topbar__actions">
+          <button id="open-project-button" type="button">Open Project</button>
+          <button id="save-project-button" type="button">Save</button>
+          <button id="save-project-as-button" type="button">Save As</button>
+          <button id="add-node-button" type="button">Add Node</button>
+          <button id="build-project-button" type="button" class="primary">
+            Build Outputs
+          </button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="column column--left">
+          <div class="panel">
+            <div class="panel__header">
+              <h2>Project</h2>
+            </div>
+
+            <dl class="project-meta">
+              <div>
+                <dt>File</dt>
+                <dd id="project-file-path">Not loaded</dd>
+              </div>
+              <div>
+                <dt>Name</dt>
+                <dd id="project-name">-</dd>
+              </div>
+              <div>
+                <dt>Status</dt>
+                <dd id="project-status">Starting…</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="panel">
+            <div class="panel__header">
+              <h2>Problem</h2>
+            </div>
+
+            <label class="field">
+              <span>Selected problem</span>
+              <select id="problem-select"></select>
+            </label>
+          </div>
+
+          <div class="panel panel--stretch">
+            <div class="panel__header">
+              <h2>Route Nodes</h2>
+              <p class="panel__hint">
+                Ordered by step number for the selected problem.
+              </p>
+            </div>
+
+            <div id="node-list" class="node-list"></div>
+          </div>
+        </section>
+
+        <section class="column column--center">
+          <div class="panel panel--stretch">
+            <div class="panel__header">
+              <h2>Node Editor</h2>
+              <p class="panel__hint">
+                This is the thin UI layer before document selection exists.
+              </p>
+            </div>
+
+            <form id="node-editor-form" class="editor-form">
+              <label class="field">
+                <span>Title</span>
+                <input id="node-title-input" type="text" />
+              </label>
+
+              <label class="field">
+                <span>Body text</span>
+                <textarea id="node-body-input" rows="8"></textarea>
+              </label>
+
+              <div class="field-grid">
+                <label class="field">
+                  <span>Step</span>
+                  <input id="node-step-input" type="number" min="1" step="1" />
+                </label>
+
+                <label class="field">
+                  <span>Weight</span>
+                  <input
+                    id="node-weight-input"
+                    type="number"
+                    min="0"
+                    step="1"
+                  />
+                </label>
+              </div>
+
+              <label class="field">
+                <span>Keywords</span>
+                <input id="node-keywords-input" type="text" />
+              </label>
+
+              <label class="field">
+                <span>Notes</span>
+                <textarea id="node-notes-input" rows="4"></textarea>
+              </label>
+
+              <div class="source-card">
+                <h3>Source Anchor</h3>
+                <p id="anchor-display-name" class="source-card__title">-</p>
+                <p id="anchor-source-path" class="source-card__path">-</p>
+                <p id="anchor-selected-text" class="source-card__text">-</p>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <section class="column column--right">
+          <div class="panel panel--stretch">
+            <div class="panel__header">
+              <h2>Generated YAML</h2>
+              <p class="panel__hint">
+                This pane is generated from project-state and stays transparent.
+              </p>
+            </div>
+
+            <pre id="yaml-preview" class="yaml-preview">Loading…</pre>
+          </div>
+
+          <div class="panel">
+            <div class="panel__header">
+              <h2>Build Result</h2>
+            </div>
+            <pre id="build-output" class="build-output">
+No build has been run yet.
+            </pre>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="./app.mjs"></script>
+  </body>
+  </html>

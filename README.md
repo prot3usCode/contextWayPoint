@@ -210,6 +210,14 @@ The project-to-authoring bridge lives in:
 - `src/contextwaypoint/project.py`
 - `src/contextwaypoint/project_export.py`
 
+An experimental authoring shell now lives in:
+
+- `apps/authoringApp/`
+
+That shell edits internal project-state, shows live generated YAML, and builds
+compiled JSON through the current Python engine. It is intentionally separate
+from the stable YAML-first workflow.
+
 ## Security
 
 Security reporting guidance lives in:

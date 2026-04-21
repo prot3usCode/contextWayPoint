@@ -1,0 +1,15 @@
+{
+  "name": "contextwaypoint-authoring-app",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Minimal authoring shell for contextWayPoint project-state editing.",
+  "type": "module",
+  "main": "main.mjs",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^36.0.0"
+  }
+}
