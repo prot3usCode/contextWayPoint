@@ -20,6 +20,7 @@ from contextwaypoint.project_export import (
     render_project_yaml_from_file,
     slugify,
 )
+from contextwaypoint.runtime_execution import preview_macro_execution_from_file
 from contextwaypoint.router import route_and_write
 from contextwaypoint.validation import print_validation_errors, validate_source
 
@@ -129,6 +130,16 @@ def command_project_build(args: argparse.Namespace) -> int:
         json_output_file=args.json_out,
     )
     print(message)
+    return 0
+
+
+def command_macro_preview(args: argparse.Namespace) -> int:
+    preview = preview_macro_execution_from_file(
+        workspace_file=args.workspace_file,
+        macro_id=args.macro_id,
+        prompt_text=args.prompt or "",
+    )
+    print(preview)
     return 0
 
 
@@ -292,6 +303,28 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"Compiled JSON output file. Default: {DEFAULT_INDEX_FILE}",
     )
     project_build_parser.set_defaults(func=command_project_build)
+
+    macro_preview_parser = subparsers.add_parser(
+        "macro-preview",
+        help="Preview one macro by resolving linked problems through the routing engine.",
+    )
+    macro_preview_parser.add_argument(
+        "workspace_file",
+        type=Path,
+        help="Macro workspace JSON file.",
+    )
+    macro_preview_parser.add_argument(
+        "--macro",
+        dest="macro_id",
+        required=True,
+        help="Macro ID to preview.",
+    )
+    macro_preview_parser.add_argument(
+        "--prompt",
+        default="",
+        help="Prompt text used for branch evaluation during the preview.",
+    )
+    macro_preview_parser.set_defaults(func=command_macro_preview)
 
     return parser
 

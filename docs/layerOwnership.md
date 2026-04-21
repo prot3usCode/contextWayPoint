@@ -38,9 +38,38 @@ It should own:
 These are important to the visualizer, but most of them do not belong in the
 exported routing YAML.
 
-### 2. Generated YAML
+### 2. Macro Workspace JSON
 
-This is the live authored artifact the user can inspect.
+This is the composition layer for the future `Macro Creator`.
+
+It should own:
+
+- references to authored projects
+- macro definitions
+- branch conditions
+- cross-project problem links
+- default route mode and output behavior
+
+This layer should be JSON-first because it is workflow logic, not authored
+context text.
+
+### 3. Runtime Session JSON
+
+This is the prompt-time context management layer.
+
+It should own:
+
+- prompt history
+- applied macro/problem adjustments
+- active context state
+- snapshots
+- rollback metadata
+
+This layer should also be JSON-first.
+
+### 4. Generated YAML
+
+This remains the bridge artifact used by the current engine.
 
 It should own:
 
@@ -56,7 +85,10 @@ contract.
 
 The YAML should not try to store every GUI concern.
 
-### 3. Compiled JSON
+The app does not need to display this layer if it is no longer useful in the
+UI.
+
+### 5. Compiled JSON
 
 This is the queryable routing index.
 
@@ -98,6 +130,38 @@ Recommended examples:
 - `to_node_id`
 - `notes`
 - future canvas coordinates
+
+### Macro Workspace JSON
+
+Recommended examples:
+
+- `project_id`
+- `project_file`
+- `compiled_index_file`
+- `macro_id`
+- `entry_step_id`
+- `conditions`
+- `condition_id`
+- `action`
+- `macro_id`
+- `problem_ref`
+- `next_step_id`
+- `true_step_id`
+- `false_step_id`
+
+### Runtime Session JSON
+
+Recommended examples:
+
+- `session_id`
+- `agent_name`
+- `prompt_history`
+- `adjustment_id`
+- `active_adjustment_ids`
+- `snapshot_id`
+- `current_snapshot_id`
+- `output_file`
+- `compiled_json_file`
 
 ### Generated YAML
 
@@ -168,8 +232,12 @@ then it belongs in compiled JSON.
 
 ## Bottom Line
 
-The future visualizer should edit the internal project state.
+The `Authoring Shell` should edit internal project state.
 
-The YAML pane should be a live, generated authored artifact.
+The `Macro Creator` should edit macro workspace JSON.
 
-The JSON index should remain the compiled query layer.
+Prompt-time behavior should update runtime session JSON.
+
+Generated YAML can stay an internal bridge artifact.
+
+The compiled JSON index remains the query layer.

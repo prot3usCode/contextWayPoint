@@ -169,6 +169,15 @@ Instead:
 That separation is important because it lets the current branch stay useful on
 its own and keeps the future visual authoring work on a separate branch.
 
+The important product distinction now is:
+
+- `ProjectState` owns authored problems
+- the future macro layer composes those problems
+- the future runtime layer applies those composed packets to an agent session
+
+That means `ProblemDefinition` should stay the atomic authored unit that the
+later `Macro Creator` can reference instead of copying problem content around.
+
 ## Minimal Viable Export Contract
 
 The future authoring app only needs to export enough for the current engine:

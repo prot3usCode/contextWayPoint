@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
@@ -15,10 +16,48 @@ const DEFAULT_PROJECT_FILE = path.join(
   REPO_ROOT,
   "docs",
   "examples",
-  "orderFulfillmentProject.example.json"
+  "authoringShellProject.example.json"
+);
+const DEFAULT_MACRO_WORKSPACE_FILE = path.join(
+  REPO_ROOT,
+  "docs",
+  "examples",
+  "orderFulfillmentMacroWorkspace.example.json"
 );
 const GENERATED_YAML_DIR = path.join(REPO_ROOT, "output", "generatedYaml");
 const COMPILED_JSON_FILE = path.join(REPO_ROOT, "output", "contextIndex.json");
+const SUPPORTED_TEXT_FILE_TYPES = new Set([".md", ".txt"]);
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function defaultEmptyProject(projectName) {
+  const timestamp = nowIso();
+  return {
+    version: "0.1",
+    project_name: projectName,
+    created_at: timestamp,
+    updated_at: timestamp,
+    documents: [],
+    anchors: [],
+    nodes: [],
+    edges: [],
+    problems: [
+      {
+        problem_name: "New Problem",
+        description: "",
+        entry_node_id: null,
+        node_ids: [],
+        status: "draft",
+      },
+    ],
+    export_preferences: {
+      target_format: "yaml",
+      preserve_source_path: true,
+    },
+  };
+}
 
 function createWindow() {
   const window = new BrowserWindow({
@@ -28,7 +67,7 @@ function createWindow() {
     minHeight: 760,
     backgroundColor: "#f5efe4",
     webPreferences: {
-      preload: path.join(__dirname, "preload.mjs"),
+      preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -68,19 +107,83 @@ async function detectPythonExecutable() {
 }
 
 async function writeTemporaryProject(projectPayload) {
-  const tempDir = await fs.mkdtemp(
-    path.join(os.tmpdir(), "contextwaypoint-authoring-")
+  return writeTemporaryJsonPayload(
+    projectPayload,
+    "contextwaypoint-authoring-",
+    "project.json"
   );
-  const projectFile = path.join(tempDir, "project.json");
+}
+
+async function writeTemporaryMacroWorkspace(workspacePayload) {
+  return writeTemporaryJsonPayload(
+    workspacePayload,
+    "contextwaypoint-macro-",
+    "macroWorkspace.json"
+  );
+}
+
+async function writeTemporaryJsonPayload(payload, tempPrefix, fileName) {
+  const tempDir = await fs.mkdtemp(
+    path.join(os.tmpdir(), tempPrefix)
+  );
+  const filePath = path.join(tempDir, fileName);
   await fs.writeFile(
-    projectFile,
-    JSON.stringify(projectPayload, null, 2),
+    filePath,
+    JSON.stringify(payload, null, 2),
     "utf-8"
   );
 
   return {
     tempDir,
-    projectFile,
+    filePath,
+  };
+}
+
+function resolveSourcePath(sourcePath) {
+  if (path.isAbsolute(sourcePath)) {
+    return sourcePath;
+  }
+
+  return path.join(REPO_ROOT, sourcePath);
+}
+
+async function resolveJsonReferencePath(targetPath, baseDir = null) {
+  if (path.isAbsolute(targetPath)) {
+    return targetPath;
+  }
+
+  const candidatePaths = [];
+  if (baseDir) {
+    candidatePaths.push(path.join(baseDir, targetPath));
+  }
+  candidatePaths.push(path.join(REPO_ROOT, targetPath));
+
+  for (const candidate of candidatePaths) {
+    if (await pathExists(candidate)) {
+      return candidate;
+    }
+  }
+
+  return candidatePaths[0] ?? targetPath;
+}
+
+async function readSourceDocument(sourcePath) {
+  const resolvedPath = resolveSourcePath(sourcePath);
+  const extension = path.extname(resolvedPath).toLowerCase();
+  const supportedText = SUPPORTED_TEXT_FILE_TYPES.has(extension);
+  const fileBuffer = await fs.readFile(resolvedPath);
+  const fileStats = await fs.stat(resolvedPath);
+
+  return {
+    sourcePath,
+    resolvedPath,
+    displayName: path.basename(resolvedPath),
+    fileType: extension.replace(".", "") || "text",
+    supportedText,
+    content: supportedText ? fileBuffer.toString("utf-8") : "",
+    sha256: createHash("sha256").update(fileBuffer).digest("hex"),
+    modifiedAt: fileStats.mtime.toISOString(),
+    sizeBytes: fileStats.size,
   };
 }
 
@@ -102,25 +205,51 @@ async function runContextwaypoint(args) {
 }
 
 async function withTemporaryProject(projectPayload, callback) {
-  const { tempDir, projectFile } = await writeTemporaryProject(projectPayload);
+  const { tempDir, filePath } = await writeTemporaryProject(projectPayload);
 
   try {
-    return await callback(projectFile);
+    return await callback(filePath);
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true });
   }
 }
 
-async function loadProjectFile(projectFile) {
-  const contents = await fs.readFile(projectFile, "utf-8");
+async function withTemporaryMacroWorkspace(workspacePayload, callback) {
+  const { tempDir, filePath } = await writeTemporaryMacroWorkspace(workspacePayload);
+
+  try {
+    return await callback(filePath);
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+}
+
+async function loadJsonFile(filePath) {
+  const contents = await fs.readFile(filePath, "utf-8");
   return {
-    filePath: projectFile,
+    filePath,
     project: JSON.parse(contents),
+  };
+}
+
+async function loadProjectFile(projectFile) {
+  return loadJsonFile(projectFile);
+}
+
+async function loadMacroWorkspaceFile(workspaceFile) {
+  const loaded = await loadJsonFile(workspaceFile);
+  return {
+    filePath: loaded.filePath,
+    workspace: loaded.project,
   };
 }
 
 ipcMain.handle("app:get-default-project-path", async () => {
   return DEFAULT_PROJECT_FILE;
+});
+
+ipcMain.handle("app:get-default-macro-workspace-path", async () => {
+  return DEFAULT_MACRO_WORKSPACE_FILE;
 });
 
 ipcMain.handle("project:open-dialog", async () => {
@@ -138,12 +267,54 @@ ipcMain.handle("project:open-dialog", async () => {
   return loadProjectFile(result.filePaths[0]);
 });
 
+ipcMain.handle("project:new-dialog", async () => {
+  const documentsDir = app.getPath("documents");
+  const defaultName = "New Context Project";
+  const result = await dialog.showSaveDialog({
+    title: "Create contextWayPoint project",
+    defaultPath: path.join(documentsDir, `${defaultName}.project.json`),
+    filters: [{ name: "Project JSON", extensions: ["json"] }],
+  });
+
+  if (result.canceled || !result.filePath) {
+    return null;
+  }
+
+  const rawSelectedPath = result.filePath;
+  const selectedDirectory = path.dirname(rawSelectedPath);
+  const selectedFileName = path.basename(rawSelectedPath);
+  const projectBaseName = path
+    .basename(selectedFileName, path.extname(selectedFileName))
+    .replace(/\.project$/i, "")
+    .trim() || defaultName;
+  const projectFolder = path.join(selectedDirectory, projectBaseName);
+  const projectFile = path.join(
+    projectFolder,
+    `${projectBaseName}.project.json`
+  );
+  const project = defaultEmptyProject(projectBaseName);
+
+  await fs.mkdir(projectFolder, { recursive: true });
+  await fs.writeFile(projectFile, JSON.stringify(project, null, 2), "utf-8");
+
+  return {
+    filePath: projectFile,
+    project,
+  };
+});
+
 ipcMain.handle("project:load-default", async () => {
   return loadProjectFile(DEFAULT_PROJECT_FILE);
 });
 
 ipcMain.handle("project:load-file", async (_event, filePath) => {
   return loadProjectFile(filePath);
+});
+
+ipcMain.handle("project:load-reference-file", async (_event, payload) => {
+  const { filePath, baseDir } = payload;
+  const resolvedPath = await resolveJsonReferencePath(filePath, baseDir);
+  return loadProjectFile(resolvedPath);
 });
 
 ipcMain.handle("project:save", async (_event, payload) => {
@@ -170,6 +341,59 @@ ipcMain.handle("project:save-as", async (_event, project) => {
   await fs.writeFile(
     result.filePath,
     JSON.stringify(project, null, 2),
+    "utf-8"
+  );
+
+  return { filePath: result.filePath };
+});
+
+ipcMain.handle("macro:open-dialog", async () => {
+  const result = await dialog.showOpenDialog({
+    title: "Open contextWayPoint macro workspace",
+    defaultPath: DEFAULT_MACRO_WORKSPACE_FILE,
+    filters: [{ name: "Macro Workspace JSON", extensions: ["json"] }],
+    properties: ["openFile"],
+  });
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+
+  return loadMacroWorkspaceFile(result.filePaths[0]);
+});
+
+ipcMain.handle("macro:load-default", async () => {
+  return loadMacroWorkspaceFile(DEFAULT_MACRO_WORKSPACE_FILE);
+});
+
+ipcMain.handle("macro:load-file", async (_event, filePath) => {
+  return loadMacroWorkspaceFile(filePath);
+});
+
+ipcMain.handle("macro:save", async (_event, payload) => {
+  const { filePath, workspace } = payload;
+  if (!filePath) {
+    throw new Error("macro:save requires a filePath");
+  }
+
+  await fs.writeFile(filePath, JSON.stringify(workspace, null, 2), "utf-8");
+  return { filePath };
+});
+
+ipcMain.handle("macro:save-as", async (_event, workspace) => {
+  const result = await dialog.showSaveDialog({
+    title: "Save contextWayPoint macro workspace",
+    defaultPath: DEFAULT_MACRO_WORKSPACE_FILE,
+    filters: [{ name: "Macro Workspace JSON", extensions: ["json"] }],
+  });
+
+  if (result.canceled || !result.filePath) {
+    return null;
+  }
+
+  await fs.writeFile(
+    result.filePath,
+    JSON.stringify(workspace, null, 2),
     "utf-8"
   );
 
@@ -211,6 +435,48 @@ ipcMain.handle("project:build", async (_event, payload) => {
       compiledJsonFile: COMPILED_JSON_FILE,
     };
   });
+});
+
+ipcMain.handle("macro:preview", async (_event, payload) => {
+  const { workspace, macroId, promptText } = payload;
+
+  return withTemporaryMacroWorkspace(workspace, async (workspaceFile) => {
+    const { stdout, stderr } = await runContextwaypoint([
+      "macro-preview",
+      workspaceFile,
+      "--macro",
+      macroId,
+      "--prompt",
+      promptText ?? "",
+    ]);
+
+    return {
+      stdout,
+      stderr,
+      workspaceFile,
+    };
+  });
+});
+
+ipcMain.handle("document:open-dialog", async () => {
+  const result = await dialog.showOpenDialog({
+    title: "Add source document",
+    defaultPath: REPO_ROOT,
+    filters: [
+      { name: "Text and Markdown", extensions: ["md", "txt"] },
+    ],
+    properties: ["openFile"],
+  });
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+
+  return readSourceDocument(result.filePaths[0]);
+});
+
+ipcMain.handle("document:read", async (_event, sourcePath) => {
+  return readSourceDocument(sourcePath);
 });
 
 app.whenReady().then(() => {

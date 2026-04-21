@@ -1,21 +1,28 @@
 # contextWayPoint Authoring App
 
-This is the first thin authoring shell for the future visualizer branch.
+This is the first thin desktop shell for the future visualizer branch.
 
 It is intentionally minimal.
 
 What it does right now:
 
-- loads a project JSON file
+- has two tabs:
+  - `Authoring Shell`
+  - `Macro Creator`
+- loads a project JSON file for authored problems
+- loads `.md` and `.txt` source documents into a viewer
+- lets you select text from the source viewer
+- creates new nodes from the current selection
+- applies the current selection to the selected node
 - lists problems and nodes
 - lets you edit node title, body text, step, weight, keywords, and notes
-- shows the generated YAML for the selected problem
-- builds generated YAML and compiled JSON through the existing Python bridge
+- loads a macro workspace JSON file
+- lets you define linked projects, macros, macro steps, and conditions
+- runs a backend macro preview through the existing Python bridge
+- builds compiled JSON through the existing Python bridge
 
 What it does not do yet:
 
-- source-document viewing
-- text highlighting
 - drag-and-drop route editing
 - PDF support
 - undo / redo
@@ -42,16 +49,24 @@ python -m pip install -e .
 
 The app loads this example project by default:
 
-- `../../docs/examples/orderFulfillmentProject.example.json`
+- `../../docs/examples/authoringShellProject.example.json`
+
+And this example macro workspace:
+
+- `../../docs/examples/orderFulfillmentMacroWorkspace.example.json`
 
 ## Architecture
 
 The shell is deliberately thin:
 
-- renderer edits internal project-state
+- renderer edits internal project-state for authored problems
+- renderer also edits a separate macro workspace model
+- renderer reads source selections from the document viewer
 - preload exposes safe IPC methods
+- preload runs through `preload.cjs` for a stable Electron bridge
 - main process calls the Python CLI bridge
-- the Python bridge generates YAML and compiled JSON
+- main process also reads source documents from disk for `.md` and `.txt`
+- the Python bridge generates internal support files, compiled JSON, and macro previews
 
 That keeps the app transparent and lets the existing YAML/JSON engine stay the
 real backend.

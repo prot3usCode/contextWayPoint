@@ -1,0 +1,89 @@
+{
+  "version": "0.1",
+  "workspace_name": "Order Fulfillment Macros",
+  "created_at": "2026-04-21T00:00:00Z",
+  "updated_at": "2026-04-21T00:00:00Z",
+  "projects": [
+    {
+      "project_id": "order_fulfillment_project",
+      "display_name": "Order Fulfillment Investigation",
+      "project_file": "docs/examples/orderFulfillmentProject.example.json",
+      "compiled_index_file": "output/contextIndex.json",
+      "status": "available"
+    }
+  ],
+  "macros": [
+    {
+      "macro_id": "macro_order_not_shipped",
+      "name": "Order Not Shipped",
+      "description": "Route through the authored order investigation flow and branch based on shipment language in the prompt.",
+      "entry_step_id": "step_overview",
+      "steps": [
+        {
+          "step_id": "step_overview",
+          "action": "include_problem",
+          "problem_ref": {
+            "project_id": "order_fulfillment_project",
+            "problem_name": "Order Fulfillment Investigation",
+            "mode": "step",
+            "output_format": "txt",
+            "route_only": false
+          },
+          "next_step_id": "branch_shipment_language",
+          "notes": "Start with the normal authored route."
+        },
+        {
+          "step_id": "branch_shipment_language",
+          "action": "branch",
+          "condition_id": "cond_prompt_mentions_shipment",
+          "true_step_id": "step_followup_problem",
+          "false_step_id": "step_stop",
+          "notes": "If the prompt explicitly talks about shipment delay, continue to a narrower follow-up."
+        },
+        {
+          "step_id": "step_followup_problem",
+          "action": "include_problem",
+          "problem_ref": {
+            "project_id": "order_fulfillment_project",
+            "problem_name": "Order Fulfillment Investigation",
+            "mode": "weight",
+            "output_format": "txt",
+            "route_only": true
+          },
+          "next_step_id": "step_stop",
+          "notes": "Use a route-only follow-up when shipment is the main concern."
+        },
+        {
+          "step_id": "step_stop",
+          "action": "stop",
+          "notes": "Macro complete."
+        }
+      ],
+      "conditions": [
+        {
+          "condition_id": "cond_prompt_mentions_shipment",
+          "kind": "prompt_contains_any",
+          "field": "prompt_text",
+          "operator": "contains_any",
+          "values": [
+            "shipment",
+            "ship",
+            "delayed"
+          ],
+          "description": "Branch into a shipment-focused follow-up when the prompt language points there."
+        }
+      ],
+      "tags": [
+        "order",
+        "shipment",
+        "macro"
+      ],
+      "status": "draft"
+    }
+  ],
+  "runtime_defaults": {
+    "default_mode": "step",
+    "default_output_format": "txt",
+    "rollback_strategy": "snapshot"
+  }
+}

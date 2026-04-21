@@ -14,151 +14,611 @@
       <header class="topbar">
         <div class="topbar__identity">
           <p class="eyebrow">contextWayPoint</p>
-          <h1>Authoring Shell</h1>
+          <h1>Context Studio</h1>
           <p class="subtitle">
-            Edit project-state on the left. Watch generated YAML update on the
-            right.
+            Author source-backed problems in one tab, compose them into macros
+            in the next, and preview what an agent would receive before runtime.
           </p>
-        </div>
-
-        <div class="topbar__actions">
-          <button id="open-project-button" type="button">Open Project</button>
-          <button id="save-project-button" type="button">Save</button>
-          <button id="save-project-as-button" type="button">Save As</button>
-          <button id="add-node-button" type="button">Add Node</button>
-          <button id="build-project-button" type="button" class="primary">
-            Build Outputs
-          </button>
         </div>
       </header>
 
-      <main class="workspace">
-        <section class="column column--left">
-          <div class="panel">
-            <div class="panel__header">
-              <h2>Project</h2>
-            </div>
+      <div class="tabs" role="tablist" aria-label="App views">
+        <button
+          id="tab-authoring-button"
+          class="tab-button is-active"
+          type="button"
+          role="tab"
+          aria-selected="true"
+        >
+          Authoring Shell
+        </button>
+        <button
+          id="tab-macro-button"
+          class="tab-button"
+          type="button"
+          role="tab"
+          aria-selected="false"
+        >
+          Macro Creator
+        </button>
+      </div>
 
-            <dl class="project-meta">
-              <div>
-                <dt>File</dt>
-                <dd id="project-file-path">Not loaded</dd>
-              </div>
-              <div>
-                <dt>Name</dt>
-                <dd id="project-name">-</dd>
-              </div>
-              <div>
-                <dt>Status</dt>
-                <dd id="project-status">Starting…</dd>
-              </div>
-            </dl>
+      <main>
+        <section id="authoring-view" class="workspace-view is-active">
+          <div class="view-toolbar">
+            <button id="new-project-button" type="button">New Project</button>
+            <button id="open-project-button" type="button">Open Project</button>
+            <button id="add-document-button" type="button">Add Source Doc</button>
+            <button id="save-project-button" type="button">Save</button>
+            <button id="save-project-as-button" type="button">Save As</button>
+            <button id="add-node-button" type="button">Add Node</button>
+            <button id="build-project-button" type="button" class="primary">
+              Build Outputs
+            </button>
           </div>
 
-          <div class="panel">
-            <div class="panel__header">
-              <h2>Problem</h2>
-            </div>
+          <div class="workspace">
+            <section class="column column--left">
+              <div class="panel">
+                <div class="panel__header">
+                  <h2>Project</h2>
+                </div>
 
-            <label class="field">
-              <span>Selected problem</span>
-              <select id="problem-select"></select>
-            </label>
-          </div>
-
-          <div class="panel panel--stretch">
-            <div class="panel__header">
-              <h2>Route Nodes</h2>
-              <p class="panel__hint">
-                Ordered by step number for the selected problem.
-              </p>
-            </div>
-
-            <div id="node-list" class="node-list"></div>
-          </div>
-        </section>
-
-        <section class="column column--center">
-          <div class="panel panel--stretch">
-            <div class="panel__header">
-              <h2>Node Editor</h2>
-              <p class="panel__hint">
-                This is the thin UI layer before document selection exists.
-              </p>
-            </div>
-
-            <form id="node-editor-form" class="editor-form">
-              <label class="field">
-                <span>Title</span>
-                <input id="node-title-input" type="text" />
-              </label>
-
-              <label class="field">
-                <span>Body text</span>
-                <textarea id="node-body-input" rows="8"></textarea>
-              </label>
-
-              <div class="field-grid">
-                <label class="field">
-                  <span>Step</span>
-                  <input id="node-step-input" type="number" min="1" step="1" />
-                </label>
+                <dl class="project-meta">
+                  <div>
+                    <dt>File</dt>
+                    <dd id="project-file-path">Not loaded</dd>
+                  </div>
+                  <div>
+                    <dt>Name</dt>
+                    <dd id="project-name">-</dd>
+                  </div>
+                  <div>
+                    <dt>Status</dt>
+                    <dd id="project-status">Starting…</dd>
+                  </div>
+                </dl>
 
                 <label class="field">
-                  <span>Weight</span>
-                  <input
-                    id="node-weight-input"
-                    type="number"
-                    min="0"
-                    step="1"
-                  />
+                  <span>Selected problem</span>
+                  <select id="problem-select"></select>
                 </label>
               </div>
 
-              <label class="field">
-                <span>Keywords</span>
-                <input id="node-keywords-input" type="text" />
-              </label>
+              <div class="panel panel--stretch">
+                <div class="panel__header">
+                  <h2>Route Steps</h2>
+                  <p class="panel__hint">
+                    Ordered by step number for the selected problem.
+                  </p>
+                </div>
 
-              <label class="field">
-                <span>Notes</span>
-                <textarea id="node-notes-input" rows="4"></textarea>
-              </label>
-
-              <div class="source-card">
-                <h3>Source Anchor</h3>
-                <p id="anchor-display-name" class="source-card__title">-</p>
-                <p id="anchor-source-path" class="source-card__path">-</p>
-                <p id="anchor-selected-text" class="source-card__text">-</p>
+                <div class="panel__body">
+                  <div id="node-list" class="stack-list"></div>
+                </div>
               </div>
-            </form>
-          </div>
-        </section>
 
-        <section class="column column--right">
-          <div class="panel panel--stretch">
-            <div class="panel__header">
-              <h2>Generated YAML</h2>
-              <p class="panel__hint">
-                This pane is generated from project-state and stays transparent.
-              </p>
-            </div>
+              <div class="panel panel--stretch">
+                <div class="panel__header">
+                  <h2>Source Documents</h2>
+                  <p class="panel__hint">
+                    Open a `.md` or `.txt` file and select text from it.
+                  </p>
+                </div>
 
-            <pre id="yaml-preview" class="yaml-preview">Loading…</pre>
-          </div>
+                <div class="panel__body">
+                  <div id="document-list" class="stack-list"></div>
+                </div>
+              </div>
+            </section>
 
-          <div class="panel">
-            <div class="panel__header">
-              <h2>Build Result</h2>
-            </div>
-            <pre id="build-output" class="build-output">
+            <section class="column column--center">
+              <div class="panel panel--stretch">
+                <div class="panel__header">
+                  <h2>Node Editor</h2>
+                  <p class="panel__hint">
+                    Edit the selected step and attach source text when you need
+                    it.
+                  </p>
+                </div>
+
+                <div class="panel__body">
+                  <form id="node-editor-form" class="editor-form">
+                    <label class="field">
+                      <span>Title</span>
+                      <input id="node-title-input" type="text" />
+                    </label>
+
+                    <label class="field">
+                      <span>Body text</span>
+                      <textarea id="node-body-input" rows="8"></textarea>
+                    </label>
+
+                    <div class="field-grid">
+                      <label class="field">
+                        <span>Step</span>
+                        <input id="node-step-input" type="number" min="1" step="1" />
+                      </label>
+
+                      <label class="field">
+                        <span>Weight</span>
+                        <input
+                          id="node-weight-input"
+                          type="number"
+                          min="0"
+                          step="1"
+                        />
+                      </label>
+                    </div>
+
+                    <label class="field">
+                      <span>Keywords</span>
+                      <input id="node-keywords-input" type="text" />
+                    </label>
+
+                    <label class="field">
+                      <span>Notes</span>
+                      <textarea id="node-notes-input" rows="4"></textarea>
+                    </label>
+
+                    <div class="source-card">
+                      <h3>Source Anchor</h3>
+                      <p id="anchor-display-name" class="source-card__title">-</p>
+                      <p id="anchor-source-path" class="source-card__path">-</p>
+                      <p id="anchor-selected-text" class="source-card__text">-</p>
+                    </div>
+                  </form>
+                </div>
+              </div>
+
+              <div class="panel">
+                <div class="panel__header">
+                  <h2>Build Result</h2>
+                </div>
+                <pre id="build-output" class="build-output">
 No build has been run yet.
-            </pre>
+                </pre>
+              </div>
+            </section>
+
+            <section class="column column--right">
+              <div class="panel panel--stretch">
+                <div class="panel__header">
+                  <h2>Document Viewer</h2>
+                  <p class="panel__hint">
+                    Read the source on the right, then highlight text to attach
+                    it to a node.
+                  </p>
+                </div>
+
+                <div class="viewer-meta">
+                  <p id="viewer-document-name" class="viewer-meta__name">No document selected</p>
+                  <p id="viewer-document-path" class="viewer-meta__path">-</p>
+                </div>
+
+                <div
+                  id="document-viewer"
+                  class="document-viewer"
+                  tabindex="0"
+                  aria-label="Source document viewer"
+                ></div>
+
+                <div class="selection-toolbar">
+                  <div class="selection-toolbar__meta">
+                    <p class="selection-toolbar__label">Current selection</p>
+                    <p id="selection-summary" class="selection-toolbar__summary">
+                      Select text in the viewer to create or update an anchor.
+                    </p>
+                  </div>
+                  <div class="selection-toolbar__actions">
+                    <button id="create-node-from-selection-button" type="button">
+                      Create Node From Selection
+                    </button>
+                    <button id="apply-selection-to-node-button" type="button">
+                      Apply Selection To Node
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section id="macro-view" class="workspace-view">
+          <div class="view-toolbar">
+            <button id="open-macro-workspace-button" type="button">
+              Open Workspace
+            </button>
+            <button id="save-macro-workspace-button" type="button">Save</button>
+            <button id="save-macro-workspace-as-button" type="button">
+              Save As
+            </button>
+            <button id="add-workspace-project-button" type="button">
+              Add Linked Project
+            </button>
+            <button id="add-macro-button" type="button">Add Macro</button>
+            <button id="preview-macro-button" type="button" class="primary">
+              Preview Macro
+            </button>
+          </div>
+
+          <div class="macro-top-row">
+            <div class="panel panel--fixed macro-top-panel">
+              <div class="panel__header">
+                <h2>Macros</h2>
+                <p class="panel__hint">
+                  Keep the reusable top-level flows visible without digging.
+                </p>
+              </div>
+              <div class="panel__body">
+                <div id="macro-list" class="stack-list stack-list--macros"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="workspace workspace--macro">
+            <section class="column column--left">
+              <div class="panel panel--fixed">
+                <div class="panel__header">
+                  <h2>Linked Project Folder</h2>
+                  <p class="panel__hint">
+                    Choose the authored project whose problems you want to pull
+                    into macros.
+                  </p>
+                </div>
+                <div class="panel__body">
+                  <form class="editor-form">
+                    <label class="field">
+                      <span>Workspace file</span>
+                      <input id="macro-workspace-file-path" type="text" readonly />
+                    </label>
+                    <label class="field">
+                      <span>Workspace name</span>
+                      <input id="macro-workspace-name" type="text" readonly />
+                    </label>
+                    <label class="field">
+                      <span>Workspace status</span>
+                      <input id="macro-workspace-status" type="text" readonly />
+                    </label>
+                    <label class="field">
+                      <span>Linked project</span>
+                      <select id="workspace-project-select"></select>
+                    </label>
+                    <label class="field">
+                      <span>Display name</span>
+                      <input id="workspace-project-display-name-input" type="text" />
+                    </label>
+                    <label class="field">
+                      <span>Project file</span>
+                      <input id="workspace-project-file-input" type="text" />
+                    </label>
+                    <label class="field">
+                      <span>Compiled index file</span>
+                      <input id="workspace-project-index-input" type="text" />
+                    </label>
+                    <label class="field">
+                      <span>Status</span>
+                      <input id="workspace-project-status-input" type="text" />
+                    </label>
+                  </form>
+                </div>
+              </div>
+
+              <div class="panel panel--stretch">
+                <div class="panel__header">
+                  <h2>Problems</h2>
+                  <p class="panel__hint">
+                    Macros are built from authored problems.
+                  </p>
+                </div>
+                <div class="panel__body">
+                  <div id="linked-problem-list" class="stack-list stack-list--problems"></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="column column--center">
+              <div class="panel panel--fixed">
+                <div class="panel__header">
+                  <h2>Problem Details</h2>
+                  <p class="panel__hint">
+                    Inspect the selected authored problem before linking it into
+                    a macro.
+                  </p>
+                </div>
+                <div class="panel__body">
+                  <dl class="project-meta">
+                    <div>
+                      <dt>Problem</dt>
+                      <dd id="linked-problem-name">No problem selected</dd>
+                    </div>
+                    <div>
+                      <dt>Description</dt>
+                      <dd id="linked-problem-description">-</dd>
+                    </div>
+                    <div>
+                      <dt>Status</dt>
+                      <dd id="linked-problem-status">-</dd>
+                    </div>
+                  </dl>
+                </div>
+              </div>
+
+              <div class="panel panel--stretch">
+                <div class="panel__header">
+                  <h2>Problem Steps</h2>
+                  <p class="panel__hint">
+                    Click through the authored route and inspect each step.
+                  </p>
+                </div>
+                <div class="panel__body">
+                  <div id="linked-problem-step-list" class="stack-list stack-list--problem-steps"></div>
+                </div>
+              </div>
+
+              <div class="panel panel--stretch">
+                <div class="panel__header">
+                  <h2>Selected Problem Step</h2>
+                </div>
+                <div class="panel__body">
+                  <form class="editor-form">
+                    <label class="field">
+                      <span>Title</span>
+                      <input id="linked-step-title-input" type="text" readonly />
+                    </label>
+                    <label class="field">
+                      <span>Body text</span>
+                      <textarea id="linked-step-body-input" rows="6" readonly></textarea>
+                    </label>
+                    <div class="field-grid">
+                      <label class="field">
+                        <span>Step</span>
+                        <input id="linked-step-number-input" type="text" readonly />
+                      </label>
+                      <label class="field">
+                        <span>Weight</span>
+                        <input id="linked-step-weight-input" type="text" readonly />
+                      </label>
+                    </div>
+                    <label class="field">
+                      <span>Keywords</span>
+                      <textarea id="linked-step-keywords-input" rows="3" readonly></textarea>
+                    </label>
+                    <label class="field">
+                      <span>Notes</span>
+                      <textarea id="linked-step-notes-input" rows="4" readonly></textarea>
+                    </label>
+                  </form>
+                </div>
+              </div>
+            </section>
+
+            <section class="column column--right">
+              <div class="panel panel--stretch">
+                <div class="panel__header">
+                  <h2>Macro Steps</h2>
+                  <p class="panel__hint">
+                    Start with structured editing first, then decide if the
+                    Visio-style canvas is worth it.
+                  </p>
+                </div>
+                <div class="panel__toolbar">
+                  <button id="add-problem-step-button" type="button">
+                    Add Problem Step
+                  </button>
+                  <button id="add-branch-step-button" type="button">
+                    Add Branch
+                  </button>
+                  <button id="add-stop-step-button" type="button">Add Stop</button>
+                </div>
+                <div class="panel__body">
+                  <div id="macro-step-list" class="stack-list stack-list--macro-steps"></div>
+                </div>
+              </div>
+
+              <div class="panel panel--fixed">
+                <div class="panel__header">
+                  <h2>Macro Details</h2>
+                </div>
+                <div class="panel__body">
+                  <form class="editor-form">
+                    <label class="field">
+                      <span>Name</span>
+                      <input id="macro-name-input" type="text" />
+                    </label>
+                    <label class="field">
+                      <span>Description</span>
+                      <textarea id="macro-description-input" rows="3"></textarea>
+                    </label>
+                    <div class="field-grid">
+                      <label class="field">
+                        <span>Entry step</span>
+                        <select id="macro-entry-step-select"></select>
+                      </label>
+                      <label class="field">
+                        <span>Status</span>
+                        <input id="macro-status-input" type="text" />
+                      </label>
+                    </div>
+                    <label class="field">
+                      <span>Tags</span>
+                      <input id="macro-tags-input" type="text" />
+                    </label>
+                  </form>
+                </div>
+              </div>
+
+              <div class="panel panel--stretch">
+                <div class="panel__header">
+                  <h2>Selected Step</h2>
+                </div>
+                <div class="panel__body">
+                  <form class="editor-form">
+                    <div class="field-grid">
+                      <label class="field">
+                        <span>Step ID</span>
+                        <input id="macro-step-id-input" type="text" />
+                      </label>
+                      <label class="field">
+                        <span>Action</span>
+                        <select id="macro-step-action-select">
+                          <option value="include_problem">include_problem</option>
+                          <option value="include_macro">include_macro</option>
+                          <option value="branch">branch</option>
+                          <option value="stop">stop</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <div class="field-grid">
+                      <label class="field">
+                        <span>Project</span>
+                        <select id="macro-step-project-select"></select>
+                      </label>
+                    <label class="field">
+                      <span>Problem name</span>
+                      <input id="macro-step-problem-input" type="text" />
+                    </label>
+                  </div>
+
+                    <div class="field-grid">
+                      <label class="field">
+                        <span>Mode</span>
+                        <select id="macro-step-mode-select">
+                          <option value="step">step</option>
+                          <option value="weight">weight</option>
+                          <option value="yaml">yaml</option>
+                          <option value="keyword">keyword</option>
+                        </select>
+                      </label>
+                      <label class="field">
+                        <span>Output format</span>
+                        <select id="macro-step-format-select">
+                          <option value="txt">txt</option>
+                          <option value="md">md</option>
+                          <option value="json">json</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <label class="field field--checkbox">
+                      <input id="macro-step-route-only-input" type="checkbox" />
+                      <span>Route only</span>
+                    </label>
+
+                    <div class="field-grid">
+                      <label class="field">
+                        <span>Nested macro</span>
+                        <select id="macro-step-nested-macro-select"></select>
+                      </label>
+                      <label class="field">
+                        <span>Condition</span>
+                        <select id="macro-step-condition-select"></select>
+                      </label>
+                    </div>
+
+                    <div class="field-grid">
+                      <label class="field">
+                        <span>Next step</span>
+                        <select id="macro-step-next-select"></select>
+                      </label>
+                      <label class="field">
+                        <span>True branch</span>
+                        <select id="macro-step-true-select"></select>
+                      </label>
+                    </div>
+
+                    <label class="field">
+                      <span>False branch</span>
+                      <select id="macro-step-false-select"></select>
+                    </label>
+
+                    <label class="field">
+                      <span>Notes</span>
+                      <textarea id="macro-step-notes-input" rows="4"></textarea>
+                    </label>
+                  </form>
+                </div>
+              </div>
+
+              <div class="panel panel--fixed">
+                <div class="panel__header">
+                  <h2>Conditions</h2>
+                </div>
+                <div class="panel__toolbar">
+                  <button id="add-condition-button" type="button">
+                    Add Condition
+                  </button>
+                </div>
+                <div class="panel__body">
+                  <div id="macro-condition-list" class="stack-list stack-list--compact"></div>
+                  <form class="editor-form editor-form--compact">
+                    <div class="field-grid">
+                      <label class="field">
+                        <span>Condition ID</span>
+                        <input id="macro-condition-id-input" type="text" />
+                      </label>
+                      <label class="field">
+                        <span>Kind</span>
+                        <select id="macro-condition-kind-select">
+                          <option value="prompt_contains_any">prompt_contains_any</option>
+                          <option value="prompt_contains_all">prompt_contains_all</option>
+                          <option value="always">always</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div class="field-grid">
+                      <label class="field">
+                        <span>Field</span>
+                        <input id="macro-condition-field-input" type="text" />
+                      </label>
+                      <label class="field">
+                        <span>Operator</span>
+                        <input id="macro-condition-operator-input" type="text" />
+                      </label>
+                    </div>
+                    <label class="field">
+                      <span>Values</span>
+                      <input id="macro-condition-values-input" type="text" />
+                    </label>
+                    <label class="field">
+                      <span>Description</span>
+                      <textarea id="macro-condition-description-input" rows="3"></textarea>
+                    </label>
+                  </form>
+                </div>
+              </div>
+
+              <div class="panel panel--stretch">
+                <div class="panel__header">
+                  <h2>Runtime Preview</h2>
+                  <p class="panel__hint">
+                    Preview what this macro would resolve before an agent sees
+                    it.
+                  </p>
+                </div>
+                <div class="panel__body">
+                  <label class="field">
+                    <span>Prompt</span>
+                    <textarea id="macro-prompt-input" rows="4"></textarea>
+                  </label>
+                  <pre id="macro-preview-output" class="build-output build-output--tall">
+No macro preview has been run yet.
+                  </pre>
+                </div>
+              </div>
+            </section>
           </div>
         </section>
       </main>
     </div>
 
+    <div id="context-menu" class="context-menu" hidden>
+      <button id="context-menu-copy" type="button">Copy</button>
+      <button id="context-menu-cut" type="button">Cut</button>
+      <button id="context-menu-delete" type="button">Delete</button>
+    </div>
+
     <script type="module" src="./app.mjs"></script>
   </body>
-  </html>
+</html>

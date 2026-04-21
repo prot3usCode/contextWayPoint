@@ -217,6 +217,14 @@ def write_project_yaml(
     return written_paths
 
 
+def clear_generated_yaml_files(output_dir: Path) -> None:
+    if not output_dir.exists():
+        return
+
+    for path in output_dir.glob("*.generated.yaml"):
+        path.unlink()
+
+
 def render_project_yaml_from_file(project_file: Path) -> dict[str, str]:
     return render_project_yaml(load_project(project_file))
 
@@ -227,6 +235,7 @@ def build_project_outputs(
     json_output_file: Path = DEFAULT_INDEX_FILE,
 ) -> str:
     project = load_project(project_file)
+    clear_generated_yaml_files(yaml_output_dir)
     written_paths = write_project_yaml(project, yaml_output_dir)
     compile_message = compile_source(yaml_output_dir, json_output_file)
     yaml_label = ", ".join(display_path(path) for path in written_paths)

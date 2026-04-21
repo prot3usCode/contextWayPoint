@@ -132,6 +132,12 @@ Build project JSON into generated YAML and compiled JSON:
 contextwaypoint project-build docs/examples/orderFulfillmentProject.example.json --yaml-out output/generatedYaml --json-out output/contextIndex.json
 ```
 
+Preview one macro by resolving linked problems through the router:
+
+```bash
+contextwaypoint macro-preview docs/examples/orderFulfillmentMacroWorkspace.example.json --macro macro_order_not_shipped --prompt "Why has order 4 not shipped?"
+```
+
 ## Demo Context
 
 The clearest multi-document example uses:
@@ -179,7 +185,10 @@ The pre-authoring design docs for a future visualizer branch live in:
 - `docs/projectModel.md`
 - `docs/sourceAnchoring.md`
 - `docs/layerOwnership.md`
+- `docs/macroRuntimeModel.md`
 - `docs/examples/orderFulfillmentProject.example.json`
+- `docs/examples/orderFulfillmentMacroWorkspace.example.json`
+- `docs/examples/orderFulfillmentSessionState.example.json`
 
 The lightweight evaluation scaffold lives in:
 
@@ -209,14 +218,21 @@ The project-to-authoring bridge lives in:
 
 - `src/contextwaypoint/project.py`
 - `src/contextwaypoint/project_export.py`
+- `src/contextwaypoint/runtime_model.py`
 
 An experimental authoring shell now lives in:
 
 - `apps/authoringApp/`
 
-That shell edits internal project-state, shows live generated YAML, and builds
-compiled JSON through the current Python engine. It is intentionally separate
-from the stable YAML-first workflow.
+That shell now has two tabs:
+
+- `Authoring Shell`
+- `Macro Creator`
+
+It edits internal project-state, lets you attach `.md` / `.txt` source
+selections to nodes, defines macro workspaces with steps and conditions, and
+previews macro execution through the current Python engine. It is intentionally
+separate from the stable YAML-first workflow.
 
 ## Security
 
