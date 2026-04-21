@@ -120,6 +120,18 @@ Fill blank UUIDs to a new directory:
 contextwaypoint fill-uuids Formats --out filledFormats
 ```
 
+Render generated YAML from a project JSON file:
+
+```bash
+contextwaypoint project-render docs/examples/orderFulfillmentProject.example.json
+```
+
+Build project JSON into generated YAML and compiled JSON:
+
+```bash
+contextwaypoint project-build docs/examples/orderFulfillmentProject.example.json --yaml-out output/generatedYaml --json-out output/contextIndex.json
+```
+
 ## Demo Context
 
 The clearest multi-document example uses:
@@ -166,6 +178,7 @@ The pre-authoring design docs for a future visualizer branch live in:
 
 - `docs/projectModel.md`
 - `docs/sourceAnchoring.md`
+- `docs/layerOwnership.md`
 - `docs/examples/orderFulfillmentProject.example.json`
 
 The lightweight evaluation scaffold lives in:
@@ -191,6 +204,11 @@ The original script entry points still exist for compatibility:
 - `src/contextValidator.py`
 - `src/contextCompiler.py`
 - `src/contextRouter.py`
+
+The project-to-authoring bridge lives in:
+
+- `src/contextwaypoint/project.py`
+- `src/contextwaypoint/project_export.py`
 
 ## Security
 

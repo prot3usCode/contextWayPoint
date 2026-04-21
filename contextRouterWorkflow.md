@@ -191,7 +191,27 @@ map, generates a routed packet, and writes a demo report under:
 
 - `output/demos/order-4-not-shipped/`
 
-## 7. Run the Tests
+## 7. Render Project JSON Into Generated YAML
+
+Render the generated YAML for a project JSON file:
+
+```bash
+contextwaypoint project-render docs/examples/orderFulfillmentProject.example.json
+```
+
+Build generated YAML and compile it into queryable JSON:
+
+```bash
+contextwaypoint project-build docs/examples/orderFulfillmentProject.example.json --yaml-out output/generatedYaml --json-out output/contextIndex.json
+```
+
+This is the headless bridge for a future visual authoring branch:
+
+- internal project JSON
+- generated authored YAML
+- compiled queryable JSON
+
+## 8. Run the Tests
 
 Run the engine test suite with:
 
@@ -199,7 +219,7 @@ Run the engine test suite with:
 python -m unittest discover -s tests
 ```
 
-## 8. Legacy Script Entry Points
+## 9. Legacy Script Entry Points
 
 The old script commands still work:
 

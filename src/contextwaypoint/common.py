@@ -11,6 +11,7 @@ OUTPUT_DIR = PROJECT_ROOT / "output"
 DEFAULT_INDEX_FILE = OUTPUT_DIR / "contextIndex.json"
 DEFAULT_PACKET_DIR = OUTPUT_DIR / "contextPackets"
 DEFAULT_DEMO_OUTPUT_DIR = OUTPUT_DIR / "demos"
+DEFAULT_GENERATED_YAML_DIR = OUTPUT_DIR / "generatedYaml"
 DEMO_ROOT = PROJECT_ROOT / "demos" / "rag_vs_contextwaypoint"
 YAML_SUFFIXES = {".yaml", ".yml"}
 
