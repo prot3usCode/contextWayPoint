@@ -6,185 +6,191 @@
 
 `contextWayPoint` is a lightweight compiler and router for authored LLM context.
 
-The core idea is simple:
+The claim is simple:
 
 - RAG retrieves relevant chunks.
 - `contextWayPoint` defines and executes an authored route through context.
 
-That route can now span multiple YAML documents, preserve source traceability,
-and render either a full packet or a route map.
+That route can span multiple YAML documents, preserve source traceability, and
+render either a full context packet or only the route map.
 
 ## Why It Exists
 
-LLMs often underperform because the context they receive is:
+LLMs often fail because the context they receive is:
 
 - too broad
 - out of order
 - mixed across unrelated workflows
 - hard to trace back to a source
 
-`contextWayPoint` narrows that problem by turning authored context into
-problem-specific packets with explicit step order, source metadata, and optional
-keyword scoring.
+`contextWayPoint` is for problems where the missing piece is not just
+retrieval. The missing piece is the intended path through the context.
 
-## Current Feature Set
-
-What the code supports today:
+## What It Does Today
 
 - validate one YAML file or a directory of YAML files together
 - catch duplicate entry UUIDs across documents
 - catch duplicate `problem_uuid` values across documents
-- compile one file or many files into one global `output/contextIndex.json`
+- compile one file or many files into one flattened JSON index
 - preserve hierarchy metadata, traversal order, `source_file`, and `source_root`
-- fill blank `problem_uuid` values for a single input file and write a filled YAML copy
+- fill blank `problem_uuid` values for one file or a directory tree
 - route context by `step`, `weight`, raw authored order, or `keyword`
 - render source-aware packets as `txt`, `md`, or `json`
-- render `--route-only` output to show the problem path without full text
-- support routes that leave one document and return to it later
+- write a companion audit file for `txt` packet output
+- render `route-map` output without the full context body
+- run a one-command demo that compares unordered retrieval to an authored route
 
-Still missing:
-
-- automated tests
-- installable packaging / CLI entry points
-- evals and packet quality benchmarking
-- downstream model API integration
-
-## Included Examples
-
-The repository includes two example shapes:
-
-- `Formats/sampleBuildFailureContext.yaml`
-  Single-file sample for legacy order-flow issue triage.
-- `Formats/orderFulfillmentContext.yaml`
-- `Formats/postgresPatterns.yaml`
-- `Formats/paymentRules.yaml`
-- `Formats/inventoryRules.yaml`
-- `Formats/shipmentRules.yaml`
-  Multi-document sample for `Order Fulfillment Investigation`.
-
-The multi-document example is the clearest demonstration of the current thesis:
-one route can move through several authored files and then return to the first
-document for the final explanation step.
-
-There is also a comparison demo under:
-
-- `demos/rag_vs_contextwaypoint/`
-
-## Quick Start
+## Install
 
 From the project root:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install PyYAML
-python src/contextValidator.py --input-dir Formats
-python src/contextCompiler.py --input-dir Formats
-python src/contextRouter.py "Order Fulfillment Investigation" --mode step --format md
-python src/contextRouter.py "Order Fulfillment Investigation" --mode step --route-only --format txt
-python src/contextRouter.py "Order Fulfillment Investigation" --mode keyword --keywords payment failed shipment --format txt
+python -m pip install -e .
 ```
 
-This produces:
-
-- `output/contextIndex.json`
-- `output/contextPackets/orderFulfillmentInvestigationStep.md`
-- `output/contextPackets/orderFulfillmentInvestigationStepRoute.txt`
-- `output/contextPackets/orderFulfillmentInvestigationKeyword.txt`
-
-If you want the original single-file workflow instead:
+After that, use the installable CLI:
 
 ```bash
-python src/contextValidator.py --input Formats/sampleBuildFailureContext.yaml
-python src/contextCompiler.py --input Formats/sampleBuildFailureContext.yaml
-python src/contextRouter.py "Order Flow Issue Triage" --mode step --format txt
+contextwaypoint --help
 ```
 
-## Routing Modes
+## One-Command Demo
 
-- `step`: sort by `step_number`, then `weight`, then depth and source order
-- `weight`: sort by `weight`, then `step_number`, then depth and source order
-- `yaml`: preserve compiled traversal order
-- `keyword`: sort by keyword overlap first, then `step_number`, then `weight`
-
-Keyword mode is intentionally simple:
-
-- it only considers entries already matched to the selected `problem_name`
-- it scores token overlap against routed entry keywords, path, title, and text
-- it does not replace authored routes; it adds a search-like ordering option
-
-## Output Shapes
-
-`contextWayPoint` now renders source-aware packets. A routed Markdown packet looks
-like:
-
-```md
-## Step 3 - Payment Check
-
-Source: `Formats/paymentRules.yaml`
-Path: `Payment Rules > Payment Check`
-Weight: `95`
-
-Check the latest payment for the order...
-```
-
-If you only want the route map:
+The main milestone for the repo right now is:
 
 ```bash
-python src/contextRouter.py "Order Fulfillment Investigation" --mode step --route-only
+contextwaypoint demo order-4-not-shipped
 ```
 
-That prints the ordered path without the full context body.
+That command:
 
-For machine consumers, `--format json` includes:
+1. compiles the multi-document order-fulfillment example
+2. generates a route map
+3. generates a routed context packet
+4. prints a side-by-side demo showing why ordered authored context is different
+   from unordered retrieval
 
-- route position
-- source metadata
-- path
-- problem metadata
-- text when `--route-only` is not used
+It also writes output under:
 
-## Stable UUIDs
+- `output/demos/order-4-not-shipped/`
 
-Blank `problem_uuid` values are allowed while drafting. If you want stable values
-saved back to a YAML file, use the existing single-file fill flow:
+## CLI Commands
+
+Validate one file or a directory:
 
 ```bash
-python src/contextCompiler.py --input Formats/sampleBuildFailureContext.yaml --fill-uuids --output-yaml output/sampleBuildFailureContextFilled.yaml
+contextwaypoint validate Formats
 ```
 
-Or write them directly into the source file:
+Compile a global index:
 
 ```bash
-python src/contextCompiler.py --input Formats/sampleBuildFailureContext.yaml --fill-uuids --in-place
+contextwaypoint compile Formats --out output/contextIndex.json
 ```
 
-`--fill-uuids` currently applies only to `--input`, not `--input-dir`.
+Route a full context packet:
 
-## RAG Comparison Demo
+```bash
+contextwaypoint route "Order Fulfillment Investigation" --mode step --format md
+```
 
-Use the demo folder to explain the difference between unordered retrieval and an
-authored route:
+Route a plain text context packet plus companion audit file:
 
-- `demos/rag_vs_contextwaypoint/problem.md`
-- `demos/rag_vs_contextwaypoint/unordered_retrieved_context.md`
-- `demos/rag_vs_contextwaypoint/routed_context_packet.md`
-- `demos/rag_vs_contextwaypoint/explanation.md`
+```bash
+contextwaypoint route "Order Fulfillment Investigation" --mode step --format txt
+```
 
-The point is not that retrieval is bad. The point is that retrieval alone does
-not define the intended sequence through domain context.
+That `txt` route writes:
 
-## Main Scripts
+- a context-only packet for direct LLM or human consumption
+- a companion `Audit.txt` file with step labels, source, path, weight, UUIDs,
+  and keywords
+
+Render only the route map:
+
+```bash
+contextwaypoint route-map "Order Fulfillment Investigation"
+```
+
+Fill blank UUIDs to a new directory:
+
+```bash
+contextwaypoint fill-uuids Formats --out filledFormats
+```
+
+## Demo Context
+
+The clearest multi-document example uses:
+
+- `Formats/orderFulfillmentContext.yaml`
+- `Formats/postgresPatterns.yaml`
+- `Formats/paymentRules.yaml`
+- `Formats/inventoryRules.yaml`
+- `Formats/shipmentRules.yaml`
+
+This route is used for:
+
+- `Order Fulfillment Investigation`
+
+The demo assets that explain the RAG comparison live under:
+
+- `demos/rag_vs_contextwaypoint/`
+
+## Tests
+
+The repository now includes a focused engine test suite.
+
+Run it with:
+
+```bash
+python -m unittest discover -s tests
+```
+
+The current tests cover:
+
+- compile preserves hierarchy and `source_file`
+- step routing order
+- weight routing order
+- keyword scoring behavior
+- directory UUID filling
+
+## Thesis and Evals
+
+The concise project framing lives in:
+
+- `docs/thesis.md`
+
+The lightweight evaluation scaffold lives in:
+
+- `evals/README.md`
+- `evals/tasks/orderNotShipped.yaml`
+- `evals/tasks/inventoryShortage.yaml`
+- `evals/tasks/paymentFailure.yaml`
+
+## Package Layout
+
+The repo now has an installable package:
+
+- `pyproject.toml`
+- `src/contextwaypoint/`
+- `tests/`
+- `docs/`
+- `evals/`
+- `SECURITY.md`
+
+The original script entry points still exist for compatibility:
 
 - `src/contextValidator.py`
 - `src/contextCompiler.py`
 - `src/contextRouter.py`
-- `src/queryContext.py`
 
-## Documentation
+## Security
 
-- `contextRouterWorkflow.md` is the practical runbook.
-- `projectRepoExplanation.txt` is the plain-text repo overview.
+Security reporting guidance lives in:
+
+- `SECURITY.md`
 
 ## License
 

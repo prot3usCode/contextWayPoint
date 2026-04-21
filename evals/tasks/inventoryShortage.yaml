@@ -1,0 +1,23 @@
+# Copyright (c) 2026 Daniel Bueno
+# SPDX-License-Identifier: MIT
+# See LICENSE for the full license text.
+
+task_id: inventory-shortage
+question: Why is a paid order still blocked before shipment?
+problem_name: Inventory Shortage Investigation
+
+baseline_prompt: >
+  Explain why a paid order might still be blocked before shipment.
+
+unordered_context_prompt: >
+  Explain why a paid order is blocked using unordered context about inventory,
+  payments, shipment rules, and consistency checks.
+
+contextwaypoint_packet_prompt: >
+  Explain why a paid order is blocked using the authored route for Inventory
+  Shortage Investigation.
+
+expected_answer: >
+  The answer should identify inventory as the blocking dependency, distinguish
+  it from payment failure and shipment delay, and use the authored route to
+  explain why payment alone is not sufficient for fulfillment.

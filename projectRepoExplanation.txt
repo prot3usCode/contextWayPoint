@@ -7,21 +7,17 @@ contextWayPoint Project Explanation
 
 What this repository is
 -----------------------
-contextWayPoint is a lightweight context compiler and router for LLMs or agents.
+contextWayPoint is a lightweight compiler, router, and demo harness for
+authored LLM context.
 
-The main idea is:
-
-1. Author context as one YAML file or several related YAML files.
-2. Tag sections with one or more problem flows.
-3. Validate those files together.
-4. Compile them into one flat JSON index.
-5. Route only the entries needed for one problem.
-6. Render the result as a source-aware packet or a route map.
-
-The distinguishing claim is:
+The core claim is:
 
     RAG retrieves relevant chunks.
-    contextWayPoint defines and executes an authored route.
+    contextWayPoint defines and executes an authored route through context.
+
+This repository is meant to show that many LLM failures are not just retrieval
+failures. They are ordering failures. The model gets relevant facts, but it
+gets them in the wrong order, mixed across workflows, or without a clear route.
 
 
 High-Level Repository Flow
@@ -33,9 +29,8 @@ High-Level Repository Flow
     +----------------+
     | Validator      |
     | checks fields, |
-    | UUIDs, and     |
-    | document-level |
-    | collisions     |
+    | structure, and |
+    | UUID problems  |
     +----------------+
             |
             v
@@ -60,111 +55,185 @@ High-Level Repository Flow
             |
             v
     output/contextPackets/
+            |
+            v
+    +----------------+
+    | Demo / Evals   |
+    | show why an    |
+    | authored route |
+    | beats unordered|
+    | retrieval      |
+    +----------------+
 
 
-What changed in the current code
---------------------------------
+What the packaged CLI does
+--------------------------
 
-- Multi-document compile with `--input-dir`
-- One global index with `source_file` and `source_root`
-- Source-aware packet output
-- `keyword` routing mode
-- `--route-only` output
-- Cross-document UUID validation
-- A RAG comparison demo folder
+The repository now includes an installable CLI called:
 
+    contextwaypoint
 
-Core Files
-----------
+The main commands are:
 
-README.md
-  High-level overview and quick-start commands.
+- validate
+- compile
+- route
+- route-map
+- fill-uuids
+- demo
 
-contextRouterWorkflow.md
-  Practical runbook for validation, compile, routing, and demo usage.
-
-src/contextValidator.py
-  Validates one file or a directory of YAML files together.
-
-src/contextCompiler.py
-  Compiles one file or many files into a flat JSON index and can fill blank
-  problem UUIDs for a single file.
-
-src/contextRouter.py
-  Thin entry-point script for the router.
-
-src/queryContext.py
-  Main routing logic. Matches entries by problem name, sorts by route mode,
-  renders packets, and writes output files.
-
-Formats/
-  Sample authored context files, including a multi-document route example.
-
-demos/rag_vs_contextwaypoint/
-  Explanation folder contrasting unordered retrieval with an authored route.
+That means the project is no longer just a collection of standalone scripts.
+It can now be installed in editable mode and run like a developer tool.
 
 
-Current Routing Modes
----------------------
+High-Level CLI Examples
+-----------------------
 
-- step
-- weight
-- yaml
-- keyword
+Install locally:
 
-Current Output Shapes
----------------------
+    python -m pip install -e .
 
-- txt
-- md
-- json
-- route-only variants
+Validate all example files:
 
+    contextwaypoint validate Formats
 
-Typical Commands
-----------------
+Compile a single global index:
 
-Validate all example files together:
+    contextwaypoint compile Formats --out output/contextIndex.json
 
-    .venv/bin/python src/contextValidator.py --input-dir Formats
+Render a routed packet:
 
-Compile them into one global index:
+    contextwaypoint route "Order Fulfillment Investigation" --mode step --format md
 
-    .venv/bin/python src/contextCompiler.py --input-dir Formats
+Render only the route map:
 
-Render the cross-document packet:
+    contextwaypoint route-map "Order Fulfillment Investigation"
 
-    .venv/bin/python src/contextRouter.py "Order Fulfillment Investigation" --mode step --format md
+Fill blank problem UUIDs:
 
-Print only the route map:
+    contextwaypoint fill-uuids Formats --out filledFormats
 
-    .venv/bin/python src/contextRouter.py "Order Fulfillment Investigation" --mode step --route-only --format txt
+Run the main project demo:
 
-Use keyword mode:
-
-    .venv/bin/python src/contextRouter.py "Order Fulfillment Investigation" --mode keyword --keywords payment failed shipment --format txt
+    contextwaypoint demo order-4-not-shipped
 
 
 What the repository demonstrates
 --------------------------------
 
-At its core, the repository demonstrates this pattern:
+At its best, the repository demonstrates this pattern:
 
-    broad documentation or retrieved chunks
+    unordered retrieved context
                ->
     authored structured context
                ->
     compiled queryable index
                ->
-    routed, traceable problem packet
+    deterministic routed packet
                ->
-    better-targeted LLM input
+    clearer, more traceable LLM input
+
+The key idea is not just relevance.
+The key idea is route.
+
+
+Core Files and Folders
+----------------------
+
+README.md
+  Quick explanation of the project, install steps, CLI commands, demo, and
+  tests.
+
+contextRouterWorkflow.md
+  Practical runbook for install, validate, compile, route, fill UUIDs, demo,
+  and tests.
+
+pyproject.toml
+  Package metadata for editable install and the CLI entrypoint.
+
+build_backend.py
+  Local lightweight build backend so the project can install cleanly in a more
+  restricted environment.
+
+src/contextwaypoint/
+  Packaged implementation of the validator, compiler, router, demo flow, and
+  CLI.
+
+src/contextValidator.py
+src/contextCompiler.py
+src/contextRouter.py
+src/queryContext.py
+  Thin compatibility wrappers that still let the older script-style commands
+  work.
+
+Formats/
+  Sample authored context files, including the multi-document order
+  fulfillment example.
+
+demos/rag_vs_contextwaypoint/
+  Demo assets used to show the difference between unordered retrieval and an
+  authored route.
+
+docs/thesis.md
+  Concise framing of the repository's thesis.
+
+evals/
+  Small evaluation scaffold with task definitions for comparing baseline,
+  unordered, and routed prompts.
+
+tests/
+  Focused unit tests for core compiler and router behavior.
+
+
+Current Core Features
+---------------------
+
+- Validate one file or a directory of YAML together
+- Catch duplicate entry UUIDs across documents
+- Catch duplicate problem UUIDs across documents
+- Compile one file or many files into one flat JSON index
+- Preserve hierarchy, path, depth, source order, source file, and source root
+- Fill blank problem UUIDs to a new file, directory, or in place
+- Route by step
+- Route by weight
+- Route by authored YAML order
+- Route by keyword overlap
+- Render packets as txt, md, or json
+- Render route-only output
+- Run a one-command demo
+- Run a focused test suite
+
+
+Current Demonstration Story
+---------------------------
+
+The clearest current story in the repository is:
+
+1. Ask: Why has order 4 not shipped?
+2. Show unordered retrieved context that is all relevant but badly staged.
+3. Show the authored route through domain overview, order flow, payment,
+   inventory, shipment, and explanation rules.
+4. Generate the routed packet.
+5. Make the difference obvious.
+
+That is the point where the project starts to feel like a real tool rather
+than an interesting script.
 
 
 What is still missing
 ---------------------
 
-- automated tests
-- packaging / installable CLI
-- evals
+- richer automated evaluation
 - downstream model integrations
+- a larger library of real workflow examples
+- a GUI or authoring app layer
+- packaging polish for broader distribution
+
+
+Current milestone
+-----------------
+
+The current milestone is:
+
+    A stranger can clone the repo, install it, run one command, and understand
+    why ordered authored context is different from generic retrieval.

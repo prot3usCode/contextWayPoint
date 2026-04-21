@@ -1,0 +1,14 @@
+[build-system]
+requires = []
+build-backend = "build_backend"
+backend-path = ["."]
+
+[project]
+name = "contextwaypoint"
+version = "0.1.0"
+description = "Compiler and router for authored LLM context."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["PyYAML>=6.0"]
+authors = [{ name = "Daniel Bueno" }]
+license = { file = "LICENSE" }

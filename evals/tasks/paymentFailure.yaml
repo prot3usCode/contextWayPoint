@@ -1,0 +1,23 @@
+# Copyright (c) 2026 Daniel Bueno
+# SPDX-License-Identifier: MIT
+# See LICENSE for the full license text.
+
+task_id: payment-failure
+question: Why did fulfillment stop before shipment creation?
+problem_name: Payment Failure Investigation
+
+baseline_prompt: >
+  Explain why fulfillment stopped before shipment creation.
+
+unordered_context_prompt: >
+  Explain why fulfillment stopped using unordered context about payment status,
+  inventory, shipment state, and consistency rules.
+
+contextwaypoint_packet_prompt: >
+  Explain why fulfillment stopped using the authored route for Payment Failure
+  Investigation.
+
+expected_answer: >
+  The answer should identify the payment state as the first blocking condition,
+  avoid jumping to shipment analysis too early, and end with a concise
+  explanation tied back to the authored route.

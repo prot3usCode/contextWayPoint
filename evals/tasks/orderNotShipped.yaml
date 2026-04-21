@@ -1,0 +1,26 @@
+# Copyright (c) 2026 Daniel Bueno
+# SPDX-License-Identifier: MIT
+# See LICENSE for the full license text.
+
+task_id: order-not-shipped
+question: Why has order 4 not shipped?
+problem_name: Order Fulfillment Investigation
+
+baseline_prompt: >
+  Explain why order 4 has not shipped.
+
+unordered_context_prompt: >
+  Explain why order 4 has not shipped using a set of relevant but unordered
+  chunks about shipment state, payment status, inventory availability, SQL
+  latest-record patterns, and fulfillment explanation rules.
+
+contextwaypoint_packet_prompt: >
+  Explain why order 4 has not shipped using the authored route for Order
+  Fulfillment Investigation. Follow the route in order and tie the final answer
+  back to the evidence.
+
+expected_answer: >
+  The answer should move through the fulfillment route in order, explain the
+  most recent payment and inventory state before shipment status, and conclude
+  with a clear root-cause explanation rather than a loose summary of retrieved
+  chunks.

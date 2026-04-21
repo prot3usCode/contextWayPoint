@@ -4,50 +4,27 @@
 
 # contextWayPoint Workflow
 
-This is the practical runbook for the current codebase. It covers both the
-original single-file flow and the newer multi-document route flow.
+This document is the practical runbook for the current packaged version of
+`contextWayPoint`.
 
-## What the Project Does
+## Main Path
 
-`contextWayPoint` helps convert authored YAML context into problem-specific
-packets for an LLM or agent.
+The simplest current path is:
 
-Current workflow:
+1. install the package in editable mode
+2. validate a file or directory of YAML
+3. compile the flattened JSON index
+4. route a context packet or route map
+5. run the demo when you want to show the project claim clearly
 
-1. write one YAML file or several related YAML files
-2. attach problem flows to sections
-3. validate those files together
-4. compile them into one flat JSON index
-5. route the entries for one problem
-6. render either a full packet or a route map
-
-Current routing modes:
-
-- `step`
-- `weight`
-- `yaml`
-- `keyword`
-
-Current output formats:
-
-- `txt`
-- `md`
-- `json`
-
-## Project Root
-
-Run commands from:
-
-`contextWaypoint`
-
-## 1. Set Up Python
+## 1. Install the CLI
 
 ### macOS or Linux
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install PyYAML
+python -m pip install -e .
 ```
 
 ### Windows 11
@@ -55,100 +32,38 @@ python -m pip install PyYAML
 ```powershell
 py -3 -m venv .venv
 .venv\Scripts\Activate.ps1
-python -m pip install PyYAML
+python -m pip install -e .
 ```
 
-If PowerShell activation is blocked, run the venv Python directly:
+If PowerShell activation is blocked:
 
 ```powershell
 py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install PyYAML
-.\.venv\Scripts\python.exe .\src\contextValidator.py --input-dir .\Formats
-.\.venv\Scripts\python.exe .\src\contextCompiler.py --input-dir .\Formats
-.\.venv\Scripts\python.exe .\src\contextRouter.py "Order Fulfillment Investigation" --mode step --format md
+.\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\contextwaypoint.exe --help
 ```
 
-What you need:
+What this installs:
 
 - Python 3.10+
 - `PyYAML`
+- the `contextwaypoint` CLI entrypoint
 
-What you do not need:
+## 2. Validate Authored Context
 
-- Docker
-- Node
-- Postgres
-- an API key
-
-## 2. Author the Source YAML
-
-You can author one file or many files.
-
-The repository includes:
-
-- `Formats/sampleBuildFailureContext.yaml`
-  Single-file example.
-- `Formats/orderFulfillmentContext.yaml`
-- `Formats/postgresPatterns.yaml`
-- `Formats/paymentRules.yaml`
-- `Formats/inventoryRules.yaml`
-- `Formats/shipmentRules.yaml`
-  Multi-document example.
-
-Each entry can contain:
-
-- `title`
-- `uuid`
-- `text`
-- `problems`
-- `entries`
-
-Minimal shape:
-
-```yaml
-title: Root Title
-uuid: root_uuid
-problems:
-  - problem_name: Example Investigation
-    problem_uuid:
-    step_number: 1
-    weight: 80
-    keywords:
-      - payment
-
-text: >
-  Root context text.
-
-entries:
-  - title: Child Section
-    uuid: child_uuid
-    text: >
-      Child context text.
-```
-
-Notes:
-
-- every entry must have a `title`
-- every entry must have a `uuid`
-- every entry must have non-blank `text`
-- blank `problem_uuid` values are allowed while drafting
-- duplicate entry UUIDs and duplicate problem UUIDs are checked across documents
-
-## 3. Validate the YAML
-
-Single file:
+Validate one file:
 
 ```bash
-python src/contextValidator.py --input Formats/sampleBuildFailureContext.yaml
+contextwaypoint validate Formats/sampleBuildFailureContext.yaml
 ```
 
-Directory of files:
+Validate a directory together:
 
 ```bash
-python src/contextValidator.py --input-dir Formats
+contextwaypoint validate Formats
 ```
 
-Validation catches:
+Validation checks:
 
 - missing entry `title`
 - missing entry `uuid`
@@ -157,123 +72,101 @@ Validation catches:
 - missing problem `problem_name`
 - missing or invalid `step_number`
 - missing or invalid `weight`
-- blank keywords
 - duplicate `problem_uuid`
-- malformed `problems` or `entries` lists
 
-In directory mode, UUID collisions are checked across files, not only inside one
-document.
+## 3. Compile the JSON Index
 
-## 4. Compile to the Flat JSON Index
-
-Single file:
+Compile one file:
 
 ```bash
-python src/contextCompiler.py --input Formats/sampleBuildFailureContext.yaml
+contextwaypoint compile Formats/sampleBuildFailureContext.yaml --out output/contextIndex.json
 ```
 
-Directory of files:
+Compile a directory of YAML files into one global index:
 
 ```bash
-python src/contextCompiler.py --input-dir Formats
+contextwaypoint compile Formats --out output/contextIndex.json
 ```
 
-Both flows write:
+The compiled output is:
 
-`output/contextIndex.json`
+- `output/contextIndex.json`
 
-The compiled entries include:
+The compiled index preserves:
 
-- `uuid`
-- `title`
-- `parent_uuid`
-- `depth`
-- `path`
-- `text`
-- `problems`
-- `source_order`
+- entry `uuid`
+- parent/child relationship
+- depth
+- full path
+- authored traversal order as `source_order`
 - `source_file`
 - `source_root`
 
-The directory flow builds one global index, so a route can move from one YAML
-document to another and later return to the original source file.
+## 4. Fill Blank Problem UUIDs
 
-If you want a different output path:
-
-```bash
-python src/contextCompiler.py --input-dir Formats --output output/myIndex.json
-```
-
-## 5. Optionally Fill Blank Problem UUIDs
-
-Blank `problem_uuid` values are fine while drafting, but stable UUIDs are better
-for diffs and tests.
-
-Use the existing single-file fill flow:
+Fill one file to a new output file:
 
 ```bash
-python src/contextCompiler.py --input Formats/sampleBuildFailureContext.yaml --fill-uuids --output-yaml output/sampleBuildFailureContextFilled.yaml
+contextwaypoint fill-uuids Formats/sampleBuildFailureContext.yaml --out output/sampleBuildFailureContextFilled.yaml
 ```
 
-Or write directly into the source file:
+Fill a whole directory to a new directory:
 
 ```bash
-python src/contextCompiler.py --input Formats/sampleBuildFailureContext.yaml --fill-uuids --in-place
+contextwaypoint fill-uuids Formats --out filledFormats
 ```
 
-`--fill-uuids` currently works with `--input`, not `--input-dir`.
-
-## 6. Route a Context Packet
-
-Step mode:
+Or write back in place:
 
 ```bash
-python src/contextRouter.py "Order Fulfillment Investigation" --mode step --format md
+contextwaypoint fill-uuids Formats --in-place
 ```
 
-Weight mode:
+Stable `problem_uuid` values help with:
+
+- cleaner Git diffs
+- deterministic comparisons across compiles
+- later references to the same route
+- stronger tests
+
+## 5. Route a Context Packet
+
+Render a full packet:
 
 ```bash
-python src/contextRouter.py "Order Fulfillment Investigation" --mode weight --format txt
+contextwaypoint route "Order Fulfillment Investigation" --mode step --format md
 ```
 
-Raw compiled order:
+Render a plain text packet:
 
 ```bash
-python src/contextRouter.py "Order Fulfillment Investigation" --mode yaml --format txt
+contextwaypoint route "Order Fulfillment Investigation" --mode step --format txt
 ```
 
-Keyword mode:
+When you use `--format txt`, the router writes two files:
+
+- the main `.txt` packet with only the ordered context text
+- a companion `Audit.txt` file with step labels, source, path, weight, UUIDs,
+  keywords, and keyword score when relevant
+
+Render only the route map:
 
 ```bash
-python src/contextRouter.py "Order Fulfillment Investigation" --mode keyword --keywords payment failed shipment --format txt
+contextwaypoint route-map "Order Fulfillment Investigation"
 ```
 
-Current behavior by mode:
+Supported modes:
 
-- `step`: sort by `step_number`, then `weight`, then depth and source order
-- `weight`: sort by `weight`, then `step_number`, then depth and source order
-- `yaml`: preserve compiled traversal order
-- `keyword`: sort by keyword overlap first, then `step_number`, then `weight`
+- `step`
+- `weight`
+- `yaml`
+- `keyword`
 
-Keyword mode only scores entries already matched to the selected problem.
-
-## 7. Print Only the Route Map
-
-If you want proof of the route without the full packet text:
+Keyword mode requires explicit keywords:
 
 ```bash
-python src/contextRouter.py "Order Fulfillment Investigation" --mode step --route-only --format txt
+contextwaypoint route "Order Fulfillment Investigation" --mode keyword --keywords payment shipment inventory --format txt
 ```
-
-This prints the ordered route with:
-
-- route position
-- step number
-- source file
-- authored path
-
-## 8. Output Formats
 
 Supported formats:
 
@@ -281,30 +174,39 @@ Supported formats:
 - `md`
 - `json`
 
-Current behavior:
+Output files are written under:
 
-- `txt` writes a plain-text packet or route map with source metadata
-- `md` writes headings plus source metadata for README/demo usage
-- `json` writes a structured payload for downstream tools
+- `output/contextPackets/`
 
-The router always prints the result to the terminal and writes a file under:
+## 6. Run the Demo
 
-`output/contextPackets/`
+The best current one-command explanation of the repository is:
 
-## 9. RAG Comparison Demo
+```bash
+contextwaypoint demo order-4-not-shipped
+```
 
-The repository includes:
+This compiles the multi-document order-fulfillment context, generates a route
+map, generates a routed packet, and writes a demo report under:
 
-`demos/rag_vs_contextwaypoint/`
+- `output/demos/order-4-not-shipped/`
 
-Files:
+## 7. Run the Tests
 
-- `problem.md`
-- `unordered_retrieved_context.md`
-- `routed_context_packet.md`
-- `explanation.md`
+Run the engine test suite with:
 
-Use this when you need to explain the difference between:
+```bash
+python -m unittest discover -s tests
+```
 
-- relevant but unordered retrieval
-- an authored, traceable context route
+## 8. Legacy Script Entry Points
+
+The old script commands still work:
+
+```bash
+python src/contextValidator.py --input-dir Formats
+python src/contextCompiler.py --input-dir Formats
+python src/contextRouter.py "Order Fulfillment Investigation" --mode step --format md
+```
+
+Those wrappers now call the packaged implementation under `src/contextwaypoint/`.
