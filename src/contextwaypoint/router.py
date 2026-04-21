@@ -93,6 +93,7 @@ def query_by_problem(
                 "source_order": entry.get("source_order", fallback_order),
                 "source_file": entry.get("source_file", "<unknown source>"),
                 "source_root": source_root or entry.get("title", ""),
+                "origin": entry.get("origin"),
                 "matched_problem": matched_problem,
             }
         )
@@ -243,6 +244,10 @@ def append_audit_metadata_lines(
     lines.append(f"Path: {entry_path_text(item)}")
     lines.append(f"Weight: {item['matched_problem'].get('weight')}")
     lines.append(f"Problem UUID: {item['matched_problem'].get('problem_uuid')}")
+
+    origin = item.get("origin")
+    if isinstance(origin, dict) and origin.get("source_path"):
+        lines.append(f"Origin Source: {origin['source_path']}")
 
     keywords_text = entry_keywords_text(item)
     if keywords_text:
@@ -406,6 +411,7 @@ def build_json_payload(
             "path": item.get("path", []),
             "source_file": item.get("source_file"),
             "source_root": item.get("source_root"),
+            "origin": item.get("origin"),
             "step_number": problem.get("step_number"),
             "weight": problem.get("weight"),
             "problem_uuid": problem.get("problem_uuid"),

@@ -8,12 +8,19 @@ from pathlib import Path
 from contextwaypoint.common import (
     ContextValidationError,
     DEFAULT_DEMO_OUTPUT_DIR,
+    DEFAULT_GENERATED_YAML_DIR,
     DEFAULT_INDEX_FILE,
     DEFAULT_PACKET_DIR,
     display_path,
 )
 from contextwaypoint.compiler import compile_source, fill_uuid_source
 from contextwaypoint.demo import available_demo_names, demo_summary, run_demo
+from contextwaypoint.project_export import (
+    build_project_outputs,
+    render_project_yaml_from_file,
+    slugify,
+)
+from contextwaypoint.runtime_execution import preview_macro_execution_from_file
 from contextwaypoint.router import route_and_write
 from contextwaypoint.validation import print_validation_errors, validate_source
 
@@ -86,6 +93,53 @@ def command_demo(args: argparse.Namespace) -> int:
     )
     print(report)
     print(f"\n{demo_summary(output_path)}")
+    return 0
+
+
+def command_project_render(args: argparse.Namespace) -> int:
+    rendered_documents = render_project_yaml_from_file(args.project_file)
+
+    if args.problem is not None:
+        file_name = f"{slugify(args.problem)}.generated.yaml"
+        matched_name = next(
+            (
+                candidate_name
+                for candidate_name in rendered_documents
+                if candidate_name == file_name
+            ),
+            None,
+        )
+        if matched_name is None:
+            raise ValueError(f"Problem '{args.problem}' was not found in the project file")
+        print(rendered_documents[matched_name].rstrip())
+        return 0
+
+    for index, (file_name, contents) in enumerate(rendered_documents.items(), start=1):
+        if index > 1:
+            print("\n---\n")
+        print(f"# {file_name}\n")
+        print(contents.rstrip())
+
+    return 0
+
+
+def command_project_build(args: argparse.Namespace) -> int:
+    message = build_project_outputs(
+        args.project_file,
+        yaml_output_dir=args.yaml_out,
+        json_output_file=args.json_out,
+    )
+    print(message)
+    return 0
+
+
+def command_macro_preview(args: argparse.Namespace) -> int:
+    preview = preview_macro_execution_from_file(
+        workspace_file=args.workspace_file,
+        macro_id=args.macro_id,
+        prompt_text=args.prompt or "",
+    )
+    print(preview)
     return 0
 
 
@@ -211,6 +265,66 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"Directory for generated demo output. Default: {DEFAULT_DEMO_OUTPUT_DIR}",
     )
     demo_parser.set_defaults(func=command_demo)
+
+    project_render_parser = subparsers.add_parser(
+        "project-render",
+        help="Render generated YAML from an authoring project JSON file.",
+    )
+    project_render_parser.add_argument(
+        "project_file",
+        type=Path,
+        help="Project JSON file to render into generated YAML.",
+    )
+    project_render_parser.add_argument(
+        "--problem",
+        help="Optional single problem to render.",
+    )
+    project_render_parser.set_defaults(func=command_project_render)
+
+    project_build_parser = subparsers.add_parser(
+        "project-build",
+        help="Export project JSON to generated YAML and compile it to JSON.",
+    )
+    project_build_parser.add_argument(
+        "project_file",
+        type=Path,
+        help="Project JSON file to export.",
+    )
+    project_build_parser.add_argument(
+        "--yaml-out",
+        type=Path,
+        default=DEFAULT_GENERATED_YAML_DIR,
+        help=f"Directory for generated YAML. Default: {DEFAULT_GENERATED_YAML_DIR}",
+    )
+    project_build_parser.add_argument(
+        "--json-out",
+        type=Path,
+        default=DEFAULT_INDEX_FILE,
+        help=f"Compiled JSON output file. Default: {DEFAULT_INDEX_FILE}",
+    )
+    project_build_parser.set_defaults(func=command_project_build)
+
+    macro_preview_parser = subparsers.add_parser(
+        "macro-preview",
+        help="Preview one macro by resolving linked problems through the routing engine.",
+    )
+    macro_preview_parser.add_argument(
+        "workspace_file",
+        type=Path,
+        help="Macro workspace JSON file.",
+    )
+    macro_preview_parser.add_argument(
+        "--macro",
+        dest="macro_id",
+        required=True,
+        help="Macro ID to preview.",
+    )
+    macro_preview_parser.add_argument(
+        "--prompt",
+        default="",
+        help="Prompt text used for branch evaluation during the preview.",
+    )
+    macro_preview_parser.set_defaults(func=command_macro_preview)
 
     return parser
 

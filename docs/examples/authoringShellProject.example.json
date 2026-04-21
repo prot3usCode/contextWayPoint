@@ -1,0 +1,185 @@
+{
+  "version": "0.1",
+  "project_name": "Authoring Shell Demo",
+  "created_at": "2026-04-20T00:00:00Z",
+  "updated_at": "2026-04-20T00:00:00Z",
+  "documents": [
+    {
+      "document_id": "doc_problem_md",
+      "display_name": "problem.md",
+      "source_path": "demos/rag_vs_contextwaypoint/problem.md",
+      "file_type": "md",
+      "status": "available",
+      "sha256": "2578f68090dd6eaa10ae1974ee1b908e1c418ba655f247e91b12500d19158809",
+      "modified_at": "2026-04-21T03:07:54.080Z",
+      "size_bytes": 552
+    },
+    {
+      "document_id": "doc_explanation_md",
+      "display_name": "explanation.md",
+      "source_path": "demos/rag_vs_contextwaypoint/explanation.md",
+      "file_type": "md",
+      "status": "available",
+      "sha256": "27a7a8428f0a74ea2d05b3071c64858d3dcbeb7de9a4d428cb0da4ddb3075790",
+      "modified_at": "2026-04-21T01:50:43.906Z",
+      "size_bytes": 895
+    }
+  ],
+  "anchors": [
+    {
+      "anchor_id": "anchor_problem",
+      "document_id": "doc_problem_md",
+      "selected_text": "An operations analyst is investigating a concrete question:\n\nWhy has order 4 not shipped?",
+      "char_start": 12,
+      "char_end": 99,
+      "page_number": null,
+      "context_before": "# Problem\n\n",
+      "context_after": "\n\nKnown symptoms:\n",
+      "capture_method": "text_selection"
+    },
+    {
+      "anchor_id": "anchor_explanation",
+      "document_id": "doc_explanation_md",
+      "selected_text": "RAG retrieves relevant chunks.\n`contextWayPoint` defines and executes an authored route through context.",
+      "char_start": 736,
+      "char_end": 840,
+      "page_number": null,
+      "context_before": "That is the distinction the project needs to make obvious:\n\n",
+      "context_after": "",
+      "capture_method": "text_selection"
+    },
+    {
+      "anchor_id": "anchor_104fdfa9",
+      "document_id": "doc_explanation_md",
+      "selected_text": "RAG helps with:\n\n- finding relevant chunks\n- pulling context from a large corpus\n- reducing the amount of irrelevant material\n\n`contextWayPoint` helps with:\n\n- defining the intended order of reasoning\n- proving where each routed step came from\n- mixing domain context with reusable patterns from other documents\n- returning to the original document for the final explanation step",
+      "char_start": 93,
+      "char_end": 472,
+      "page_number": null,
+      "context_before": "\n\nRAG and `contextWayPoint` are solving adjacent problems, not identical ones.\n\n",
+      "context_after": "\n\nIn this demo, the retrieved chunks are all useful. The missing piece is the\nau",
+      "capture_method": "text_selection"
+    },
+    {
+      "anchor_id": "anchor_e7d73cc0",
+      "document_id": "doc_explanation_md",
+      "selected_text": "1. start with the fulfillment overview\n2. use the latest-record SQL pattern\n3. check payment\n4. check inventory\n5. check shipment\n6. explain the outcome",
+      "char_start": 576,
+      "char_end": 728,
+      "page_number": null,
+      "context_before": "ieved chunks are all useful. The missing piece is the\nauthored path that says:\n\n",
+      "context_after": "\n\nThat is the distinction the project needs to make obvious:\n\nRAG retrieves rele",
+      "capture_method": "text_selection"
+    }
+  ],
+  "nodes": [
+    {
+      "node_id": "node_problem",
+      "title": "Why has order 4 not shipped?",
+      "anchor_id": "anchor_problem",
+      "body_text": "An operations analyst is investigating a concrete question:\n\nWhy has order 4 not shipped?",
+      "notes": "",
+      "problem_assignments": [
+        {
+          "problem_name": "Authoring Shell Demo",
+          "step_number": 1,
+          "weight": 100,
+          "keywords": [
+            "order 4",
+            "problem"
+          ]
+        }
+      ]
+    },
+    {
+      "node_id": "node_claim",
+      "title": "RAG vs Authored Route",
+      "anchor_id": "anchor_explanation",
+      "body_text": "RAG retrieves relevant chunks.\n`contextWayPoint` defines and executes an authored route through context.",
+      "notes": "",
+      "problem_assignments": [
+        {
+          "problem_name": "Authoring Shell Demo",
+          "step_number": 2,
+          "weight": 90,
+          "keywords": [
+            "rag",
+            "authored route"
+          ]
+        }
+      ]
+    },
+    {
+      "node_id": "node_a5e09d2e",
+      "title": "RAG helps with: - finding relevant chunks - p...",
+      "anchor_id": "anchor_104fdfa9",
+      "body_text": "RAG helps with:\n\n- finding relevant chunks\n- pulling context from a large corpus\n- reducing the amount of irrelevant material\n\n`contextWayPoint` helps with:\n\n- defining the intended order of reasoning\n- proving where each routed step came from\n- mixing domain context with reusable patterns from other documents\n- returning to the original document for the final explanation step",
+      "notes": "",
+      "problem_assignments": [
+        {
+          "problem_name": "Authoring Shell Demo",
+          "step_number": 3,
+          "weight": 50,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "node_id": "node_74120c24",
+      "title": "SQL Steps",
+      "anchor_id": "anchor_e7d73cc0",
+      "body_text": "1. start with the fulfillment overview\n2. use the latest-record SQL pattern\n3. check payment\n4. check inventory\n5. check shipment\n6. explain the outcome",
+      "notes": "This is for gettin the data ",
+      "problem_assignments": [
+        {
+          "problem_name": "Authoring Shell Demo",
+          "step_number": 3,
+          "weight": 60,
+          "keywords": [
+            "SQLDatamodel"
+          ]
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "edge_id": "edge_authoring_1",
+      "problem_name": "Authoring Shell Demo",
+      "from_node_id": "node_problem",
+      "to_node_id": "node_claim",
+      "label": "next"
+    },
+    {
+      "edge_id": "edge_82218dde",
+      "problem_name": "Authoring Shell Demo",
+      "from_node_id": "node_claim",
+      "to_node_id": "node_a5e09d2e",
+      "label": "next"
+    },
+    {
+      "edge_id": "edge_9a1c5ca5",
+      "problem_name": "Authoring Shell Demo",
+      "from_node_id": "node_a5e09d2e",
+      "to_node_id": "node_74120c24",
+      "label": "next"
+    }
+  ],
+  "problems": [
+    {
+      "problem_name": "Authoring Shell Demo",
+      "description": "A small project used by the authoring app shell to demonstrate live YAML generation from Markdown selections.",
+      "entry_node_id": "node_problem",
+      "node_ids": [
+        "node_problem",
+        "node_claim",
+        "node_a5e09d2e",
+        "node_74120c24"
+      ],
+      "status": "draft"
+    }
+  ],
+  "export_preferences": {
+    "target_format": "yaml",
+    "preserve_source_path": true
+  }
+}

@@ -164,6 +164,7 @@ def flatten_entry(
         "text": entry.get("text", ""),
         "source_file": source_file,
         "source_root": source_root,
+        "origin": entry.get("origin"),
         "problems": [
             ensure_problem_uuid(problem)
             for problem in entry.get("problems", [])

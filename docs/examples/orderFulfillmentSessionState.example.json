@@ -1,0 +1,52 @@
+{
+  "version": "0.1",
+  "session_id": "session_order_4",
+  "session_name": "Order 4 Investigation",
+  "agent_name": "codex",
+  "created_at": "2026-04-21T00:00:00Z",
+  "updated_at": "2026-04-21T00:20:00Z",
+  "prompt_history": [
+    {
+      "timestamp": "2026-04-21T00:01:00Z",
+      "prompt_text": "Why has order 4 not shipped?",
+      "selected_macro_id": "macro_order_not_shipped",
+      "notes": "User accepted the suggested macro."
+    }
+  ],
+  "adjustments": [
+    {
+      "adjustment_id": "adj_macro_001",
+      "action": "apply_macro",
+      "created_at": "2026-04-21T00:02:00Z",
+      "status": "active",
+      "macro_id": "macro_order_not_shipped",
+      "output_mode": "step",
+      "output_format": "txt",
+      "output_file": "output/contextPackets/orderFulfillmentInvestigationStep.txt",
+      "compiled_json_file": "output/contextIndex.json",
+      "notes": "Applied the main authored route before querying the agent."
+    }
+  ],
+  "snapshots": [
+    {
+      "snapshot_id": "snap_initial",
+      "label": "Before applying macro",
+      "created_at": "2026-04-21T00:00:30Z",
+      "active_adjustment_ids": [],
+      "notes": ""
+    },
+    {
+      "snapshot_id": "snap_after_macro",
+      "label": "After applying order-not-shipped macro",
+      "created_at": "2026-04-21T00:02:05Z",
+      "active_adjustment_ids": [
+        "adj_macro_001"
+      ],
+      "notes": "Rollback target if the macro needs to be undone."
+    }
+  ],
+  "active_adjustment_ids": [
+    "adj_macro_001"
+  ],
+  "current_snapshot_id": "snap_after_macro"
+}
