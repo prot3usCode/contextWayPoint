@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: MIT
 # See LICENSE for the full license text.
 
-from contextwaypoint.router import legacy_main as main
+from contextwaypoint.cli import main
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

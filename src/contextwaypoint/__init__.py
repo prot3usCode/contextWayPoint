@@ -2,8 +2,6 @@
 # SPDX-License-Identifier: MIT
 # See LICENSE for the full license text.
 
-from contextwaypoint.router import legacy_main as main
+__all__ = ["__version__"]
 
-
-if __name__ == "__main__":
-    main()
+__version__ = "0.1.0"
